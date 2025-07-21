@@ -1,0 +1,25 @@
+# PyCharm
+../.idea/
+*.iml
+*.ipr
+*.iws
+
+# Кэш PyCharm
+/.cache/
+/.idea_modules/
+
+# Виртуальные окружения
+#venv/
+#env/
+#__pycache__/
+#*.pyc
+#*.pyo
+#*.pyd
+#.Python
+
+# Логи и базы данных
+#*.log
+#sqlite3
+
+#env
+#alembic.ini
