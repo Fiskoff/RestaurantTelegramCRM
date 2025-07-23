@@ -7,7 +7,7 @@ class BaseModel(DeclarativeBase):
     pass
 
 
-class UserRole(Enum):
+class UserRole(str, Enum):
     MANAGER = "manager"
     STAFF = "staff"
 
