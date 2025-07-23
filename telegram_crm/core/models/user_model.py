@@ -9,5 +9,5 @@ class User(BaseModel):
 
     telegram_id: Mapped[BigInteger] = mapped_column(BigInteger, primary_key=True, index=True)
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.STAFF, index=True)
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.STAFF, index=True, nullable=False)
     position: Mapped[str] = mapped_column(String(100), nullable=False)
