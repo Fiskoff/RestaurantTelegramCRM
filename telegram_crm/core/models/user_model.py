@@ -1,7 +1,7 @@
 from sqlalchemy import String, BigInteger, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from telegram_crm.core.models.base_model import BaseModel, UserRole
+from core.models.base_model import BaseModel, UserRole
 
 
 class User(BaseModel):

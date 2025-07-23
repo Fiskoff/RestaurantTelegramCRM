@@ -3,8 +3,8 @@ from datetime import datetime
 from sqlalchemy import Integer, String, Text, DateTime, Enum, func, ForeignKey, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from telegram_crm.core.models.base_model import BaseModel, TaskStatus
-from telegram_crm.core.models.user_model import User
+from core.models.base_model import BaseModel, TaskStatus
+from core.models.user_model import User
 
 
 class Task(BaseModel):
