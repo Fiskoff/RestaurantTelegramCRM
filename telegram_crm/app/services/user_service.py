@@ -5,7 +5,7 @@ from app.repository.user_repository import UserRepository
 class UserService:
 
     @staticmethod
-    async def create_new_user(telegram_id:int,full_name:str, role:str, position:str) -> dict:
+    async def create_new_user(telegram_id:int, full_name:str, role:str, position:str) -> dict:
         async with db_helper.session_factory() as session:
             user_repository = UserRepository(session)
             user = await user_repository.get_user(telegram_id)
