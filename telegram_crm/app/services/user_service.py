@@ -1,5 +1,6 @@
 from core.db_helper import db_helper
 from app.repository.user_repository import UserRepository
+from core.models import User
 from core.models.base_model import UserRole
 
 
@@ -19,3 +20,9 @@ class UserService:
                 await user_repository.create_user(telegram_id, full_name, role, position)
                 return {"success": True, "message": "Пользователь успешно создан"}
             return {"success": False, "message": "Пользователь уже существует"}
+
+    @staticmethod
+    async def get_all_users() -> list[User]:
+        async with db_helper.session_factory() as session:
+            user_repository = UserRepository(session)
+            return await user_repository.get_all_users()
