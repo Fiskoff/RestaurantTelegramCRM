@@ -22,3 +22,7 @@ class UserRepository:
     async def get_user(self, telegram_id: int):
         result = await self.session.execute(select(User).where(User.telegram_id == telegram_id))
         return result.scalars().first()
+
+    async def get_all_users(self):
+        result = await self.session.execute(select(User))
+        return result.scalars().all()
