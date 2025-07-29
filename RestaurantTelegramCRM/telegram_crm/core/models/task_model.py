@@ -11,6 +11,7 @@ class Task(BaseModel):
     __tablename__ = "tasks"
 
     task_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     deadline: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus), default=TaskStatus.ACTIVE, nullable=False)
