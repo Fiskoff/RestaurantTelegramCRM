@@ -11,8 +11,8 @@ class TaskRepository:
 
     async def create_task(self, manager_id: int, executor_id: int, title: str, description: str, deadline: datetime):
         new_user = Task(
-            executor_id=executor_id,
             manager_id=manager_id,
+            executor_id=executor_id,
             title=title,
             description=description,
             deadline=deadline
