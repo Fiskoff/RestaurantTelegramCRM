@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.models import Task
@@ -19,3 +20,11 @@ class TaskRepository:
         )
         self.session.add(new_user)
         await self.session.commit()
+
+    async def get_all_task_for_executor(self, executor_id: int):
+        result = await self.session.execute(select(Task).where(Task.executor_id == executor_id))
+        return result.scalars().all()
+
+    async def get_task_by_id(self, task_id: int):
+        result = await self.session.execute(select(Task).where(Task.task_id == task_id))
+        return result.scalars().first()
