@@ -5,7 +5,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from app.services.task_service import TaskService
-from core.models.base_model import UserRole
 
 
 task_router = Router()
