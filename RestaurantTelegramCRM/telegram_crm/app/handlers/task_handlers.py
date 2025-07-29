@@ -53,25 +53,26 @@ async def process_description(message: Message, state: FSMContext):
 @task_router.message(CreateTask.waiting_for_deadline)
 async def process_deadline(message: Message, state: FSMContext):
     deadline = message.text.strip()
+
     try:
-        deadline_datatime = datetime.strptime(deadline, "%d.%m.%Y - %H:%M")
-        deadline_db = deadline_datatime.strftime("%Y-%m-%d %H:%M:%S")
+        deadline_dt = datetime.strptime(deadline, "%d.%m.%Y - %H:%M")
     except ValueError:
         await message.answer("Неверный формат даты. Пожалуйста, укажите дату и время в формате: 01.01.2025 - 22:30")
         return
-    await state.update_data(deadline=deadline_db)
 
+    await state.update_data(deadline=deadline_dt)
     data = await state.get_data()
+
     result = await TaskService.create_new_task(
         manager_id=data["manager_id"],
         executor_id=data["executor_id"],
         title=data["title"],
         description=data["description"],
-        deadline=data["deadline"]
+        deadline=deadline_dt
     )
     await state.clear()
 
     if result['success']:
-        await message.answer(f"Задача создана!")
+        await message.answer("Задача создана!")
     else:
         await message.answer(f"Ошибка: {result['message']}")
