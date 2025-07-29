@@ -2,7 +2,7 @@ from aiogram import Router
 
 from app.handlers.registration_handler import register_router
 from app.handlers.manager_handlers import manager_router
-from app.handlers.task_handlers import task_router
+from app.handlers.create_task_handlers import task_router
 
 all_routers = Router()
 
