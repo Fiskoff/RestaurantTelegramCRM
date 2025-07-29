@@ -9,7 +9,7 @@ async def select_all_tasks_keyboard(telegram_id: int) -> InlineKeyboardMarkup:
     for task in tasks:
         button = InlineKeyboardButton(
             text=f"{task.title}",
-            callback_data=f"select_employee:{task.task_id}"
+            callback_data=f"select_tasks:{task.task_id}"
         )
         buttons.append([button])
 
