@@ -1,12 +1,13 @@
 from datetime import datetime
 
 from aiogram import Router
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from app.services.task_service import TaskService
+from app.keyboards.create_task_keyboards import create_employee_selection_keyboard
 
 
 task_router = Router()
@@ -21,9 +22,26 @@ class CreateTask(StatesGroup):
 
 @task_router.message(Command("create_task"))
 async def start_create_task(message: Message, state: FSMContext):
-    await state.update_data(manager_id=message.from_user.id)
-    await message.answer("Выберите сотрудника которому вы хотите назначить задачу. Укажите его id")
-    await state.set_state(CreateTask.waiting_for_executor_id)
+    manager_id = message.from_user.id
+    await state.update_data(manager_id=manager_id)
+
+    keyboard = await create_employee_selection_keyboard()
+    await message.answer("Выберите сотрудника, которому хотите назначить задачу:", reply_markup=keyboard)
+
+
+@task_router.callback_query(lambda c: c.data and c.data.startswith('select_employee:'))
+async def process_employee_selection(callback_query: CallbackQuery, state: FSMContext):
+    try:
+        executor_id_str = callback_query.data.split(':')[1]
+        executor_id = int(executor_id_str)
+    except (IndexError, ValueError):
+        await callback_query.answer("Ошибка при обработке выбора сотрудника.", show_alert=True)
+        return
+
+    await state.update_data(executor_id=executor_id)
+    await callback_query.answer()
+    await callback_query.message.answer("Напишите название задачи", reply_markup=None)
+    await state.set_state(CreateTask.waiting_for_title)
 
 
 @task_router.message(CreateTask.waiting_for_executor_id)
