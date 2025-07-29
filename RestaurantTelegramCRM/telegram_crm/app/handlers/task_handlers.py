@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import Command
@@ -25,7 +27,7 @@ async def start_create_task(message: Message, state: FSMContext):
 
 
 @task_router.message(CreateTask.waiting_for_executor_id)
-async def process_full_name(message: Message, state: FSMContext):
+async def process_executor(message: Message, state: FSMContext):
     executor_id = message.text.strip()
     await state.update_data(executor_id=executor_id)
     await message.answer("Напишите название задачи")
@@ -33,7 +35,7 @@ async def process_full_name(message: Message, state: FSMContext):
 
 
 @task_router.message(CreateTask.waiting_for_title)
-async def process_full_name(message: Message, state: FSMContext):
+async def process_title(message: Message, state: FSMContext):
     title = message.text.strip()
     await state.update_data(title=title)
     await message.answer("Подробно опишите, что нужно сделать?")
@@ -41,17 +43,23 @@ async def process_full_name(message: Message, state: FSMContext):
 
 
 @task_router.message(CreateTask.waiting_for_description)
-async def process_full_name(message: Message, state: FSMContext):
+async def process_description(message: Message, state: FSMContext):
     description = message.text.strip()
     await state.update_data(description=description)
-    await message.answer("Укажите дату и время окончания задачи")
+    await message.answer("Укажите дату и время окончания задачи \nВ формате: 01.01.2025 - 22:30")
     await state.set_state(CreateTask.waiting_for_deadline)
 
 
 @task_router.message(CreateTask.waiting_for_deadline)
-async def process_full_name(message: Message, state: FSMContext):
+async def process_deadline(message: Message, state: FSMContext):
     deadline = message.text.strip()
-    await state.update_data(deadline=deadline)
+    try:
+        deadline_datatime = datetime.strptime(deadline, "%d.%m.%Y - %H:%M")
+        deadline_db = deadline_datatime.strftime("%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        await message.answer("Неверный формат даты. Пожалуйста, укажите дату и время в формате: 01.01.2025 - 22:30")
+        return
+    await state.update_data(deadline=deadline_db)
 
     data = await state.get_data()
     result = await TaskService.create_new_task(
