@@ -1,7 +1,8 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from sqlalchemy import Integer, Text, DateTime, ForeignKey, BigInteger, String, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
 
 from core.models.base_model import BaseModel, TaskStatus
 from core.models.user_model import User
@@ -15,7 +16,7 @@ class Task(BaseModel):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     deadline: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus), default=TaskStatus.ACTIVE, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(ZoneInfo("Asia/Krasnoyarsk")), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     photo_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
