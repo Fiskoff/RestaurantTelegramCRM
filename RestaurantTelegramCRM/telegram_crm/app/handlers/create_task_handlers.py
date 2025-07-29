@@ -20,7 +20,7 @@ class CreateTask(StatesGroup):
     waiting_for_deadline = State()
 
 
-@task_router.message(Command("create_task"))
+@create_task_router.message(Command("create_task"))
 async def start_create_task(message: Message, state: FSMContext):
     manager_id = message.from_user.id
     await state.update_data(manager_id=manager_id)
@@ -29,7 +29,7 @@ async def start_create_task(message: Message, state: FSMContext):
     await message.answer("Выберите сотрудника, которому хотите назначить задачу:", reply_markup=keyboard)
 
 
-@task_router.callback_query(lambda c: c.data and c.data.startswith('select_employee:'))
+@create_task_router.callback_query(lambda c: c.data and c.data.startswith('select_employee:'))
 async def process_employee_selection(callback_query: CallbackQuery, state: FSMContext):
     try:
         executor_id_str = callback_query.data.split(':')[1]
@@ -44,7 +44,7 @@ async def process_employee_selection(callback_query: CallbackQuery, state: FSMCo
     await state.set_state(CreateTask.waiting_for_title)
 
 
-@task_router.message(CreateTask.waiting_for_executor_id)
+@create_task_router.message(CreateTask.waiting_for_executor_id)
 async def process_executor(message: Message, state: FSMContext):
     executor_id = message.text.strip()
     await state.update_data(executor_id=executor_id)
@@ -52,7 +52,7 @@ async def process_executor(message: Message, state: FSMContext):
     await state.set_state(CreateTask.waiting_for_title)
 
 
-@task_router.message(CreateTask.waiting_for_title)
+@create_task_router.message(CreateTask.waiting_for_title)
 async def process_title(message: Message, state: FSMContext):
     title = message.text.strip()
     await state.update_data(title=title)
@@ -60,7 +60,7 @@ async def process_title(message: Message, state: FSMContext):
     await state.set_state(CreateTask.waiting_for_description)
 
 
-@task_router.message(CreateTask.waiting_for_description)
+@create_task_router.message(CreateTask.waiting_for_description)
 async def process_description(message: Message, state: FSMContext):
     description = message.text.strip()
     await state.update_data(description=description)
@@ -68,7 +68,7 @@ async def process_description(message: Message, state: FSMContext):
     await state.set_state(CreateTask.waiting_for_deadline)
 
 
-@task_router.message(CreateTask.waiting_for_deadline)
+@create_task_router.message(CreateTask.waiting_for_deadline)
 async def process_deadline(message: Message, state: FSMContext):
     deadline = message.text.strip()
 
