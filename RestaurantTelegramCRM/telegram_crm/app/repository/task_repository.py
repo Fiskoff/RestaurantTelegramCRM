@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.models import Task, TaskStatus
+from core.models import Task, TaskStatus, User
 
 
 class TaskRepository:
@@ -40,5 +40,11 @@ class TaskRepository:
         return result.rowcount
 
     async def get_all_overdue_tasks(self):
-        result = await self.session.execute(select(Task).where(Task.status == TaskStatus.OVERDUE))
-        return result.scalars().all()
+        stmt = (
+            select(Task, User)
+            .join(User, Task.executor_id == User.telegram_id)
+            .where(Task.status == TaskStatus.OVERDUE, Task.executor_id.isnot(None))
+        )
+        result = await self.session.execute(stmt)
+        overdue_tasks_with_users = result.all()
+        return overdue_tasks_with_users
