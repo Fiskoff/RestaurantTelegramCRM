@@ -9,26 +9,27 @@ from app.handlers import all_routers
 from app.middlewares.overdue_checker_middleware import OverdueCheckerMiddleware
 
 
+bot = Bot(settings.tg.token)
+storage = MemoryStorage()
+dispatcher = Dispatcher(storage=storage)
+
+overdue_middleware = OverdueCheckerMiddleware(check_interval=300)
+dispatcher.overdue_middleware = overdue_middleware
+dispatcher.message.middleware(overdue_middleware)
+dispatcher.callback_query.middleware(overdue_middleware)
+
+dispatcher.include_router(all_routers)
+
+
 async def main():
-    bot = Bot(settings.tg.token)
-    storage = MemoryStorage()
-    dispatcher = Dispatcher(storage=storage)
-
-    overdue_middleware = OverdueCheckerMiddleware(check_interval=300)
-    dispatcher.overdue_middleware = overdue_middleware
-    dispatcher.message.middleware(overdue_middleware)
-    dispatcher.callback_query.middleware(overdue_middleware)
-
-    dispatcher.include_router(all_routers)
-
-    try:
-        await dispatcher.start_polling(bot)
-    except KeyboardInterrupt:
-        print("Exiting...")
-        if hasattr(dispatcher, 'overdue_middleware'):
-            dispatcher.overdue_middleware.stop()
+    await dispatcher.start_polling(bot)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Exiting...")
+        if hasattr(dispatcher, 'overdue_middleware'):
+            dispatcher.overdue_middleware.stop()
