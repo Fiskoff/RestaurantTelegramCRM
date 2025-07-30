@@ -1,7 +1,6 @@
 from aiogram import Router
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
-from datetime import datetime  # Для форматирования дат
 
 from app.services.task_service import TaskService
 from app.keyboards.select_all_task_keyboard import select_all_tasks_keyboard
