@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,14 +12,14 @@ class TaskRepository:
         self.session = async_session
 
     async def create_task(self, manager_id: int, executor_id: int, title: str, description: str, deadline: datetime):
-        new_user = Task(
+        new_task = Task(
             manager_id=manager_id,
             executor_id=executor_id,
             title=title,
             description=description,
             deadline=deadline
         )
-        self.session.add(new_user)
+        self.session.add(new_task)
         await self.session.commit()
 
     async def get_all_task_for_executor(self, executor_id: int):
@@ -32,7 +33,7 @@ class TaskRepository:
     async def update_status_task(self, current_time):
         stmt = (
             update(Task)
-            .where(Task.status == TaskStatus.ACTIVE,Task.deadline < current_time)
+            .where(Task.status == TaskStatus.ACTIVE, Task.deadline < current_time)
             .values(status=TaskStatus.OVERDUE)
         )
         result = await self.session.execute(stmt)
@@ -48,3 +49,21 @@ class TaskRepository:
         result = await self.session.execute(stmt)
         overdue_tasks_with_users = result.all()
         return overdue_tasks_with_users
+
+    async def complete_task(self, task_id: int, comment: str = None, photo_url: str = None):
+        kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
+        completed_at = datetime.now(kemerovo_tz)
+
+        stmt = (
+            update(Task)
+            .where(Task.task_id == task_id)
+            .values(
+                status=TaskStatus.COMPLETED,
+                completed_at=completed_at,
+                comment=comment,
+                photo_url=photo_url
+            )
+        )
+        result = await self.session.execute(stmt)
+        await self.session.commit()
+        return result.rowcount

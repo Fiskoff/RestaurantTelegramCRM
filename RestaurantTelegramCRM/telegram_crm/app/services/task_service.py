@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from core.db_helper import db_helper
 from core.models import Task
@@ -30,3 +31,16 @@ class TaskService:
         async with db_helper.session_factory() as session:
             task_repository = TaskRepository(session)
             return await task_repository.get_all_overdue_tasks()
+
+    @staticmethod
+    async def complete_task(task_id: int, comment: str = None, photo_url: str = None) -> dict:
+        async with db_helper.session_factory() as session:
+            task_repository = TaskRepository(session)
+            try:
+                result = await task_repository.complete_task(task_id, comment, photo_url)
+                if result > 0:
+                    return {"success": True, "message": "Задача успешно завершена"}
+                else:
+                    return {"success": False, "message": "Задача не найдена"}
+            except Exception as e:
+                return {"success": False, "message": f"Ошибка при завершении задачи: {str(e)}"}
