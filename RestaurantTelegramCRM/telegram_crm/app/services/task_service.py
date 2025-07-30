@@ -26,7 +26,7 @@ class TaskService:
             return await task_repository.get_task_by_id(task_id)
 
     @staticmethod
-    async def get_all_overdue_tasks() -> list[Task]:
+    async def get_all_overdue_tasks():
         async with db_helper.session_factory() as session:
             task_repository = TaskRepository(session)
             return await task_repository.get_all_overdue_tasks()
