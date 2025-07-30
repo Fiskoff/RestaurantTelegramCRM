@@ -36,4 +36,5 @@ class TaskRepository:
             .values(status=TaskStatus.OVERDUE)
         )
         result = await self.session.execute(stmt)
+        await self.session.commit()
         return result.rowcount
