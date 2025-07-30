@@ -2,23 +2,23 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from core.models import Task
 
 
-def build_tasks_keyboard(tasks: list[Task]) -> InlineKeyboardMarkup:
-    buttons = []
-    for task in tasks:
-        button = InlineKeyboardButton(
-            text=f"{task.title}",
-            callback_data=f"select_tasks:{task.task_id}"
-        )
-        buttons.append([button])
-
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-
-def format_tasks_list(tasks: list[Task], header: str) -> str:
+def format_tasks_list(tasks: list[Task], title: str) -> str:
     if not tasks:
         return ""
-    lines = [f"<b>{header}</b>"]
+
+    result = f"<b>{title}</b>\n"
+    for i, task in enumerate(tasks, 1):
+        result += f"{i}. {task.title}\n"
+    return result
+
+
+def build_tasks_keyboard(tasks: list[Task]) -> InlineKeyboardMarkup:
+    keyboard = []
     for task in tasks:
-        deadline = task.deadline.strftime("%d.%m.%Y %H:%M")
-        lines.append(f"• {task.title} (Дедлайн: {deadline})")
-    return "\n".join(lines) + "\n"
+        button = InlineKeyboardButton(
+            text=task.title,
+            callback_data=f"select_tasks:{task.task_id}"
+        )
+        keyboard.append([button])
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
