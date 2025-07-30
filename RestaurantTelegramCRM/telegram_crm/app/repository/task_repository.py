@@ -38,3 +38,7 @@ class TaskRepository:
         result = await self.session.execute(stmt)
         await self.session.commit()
         return result.rowcount
+
+    async def get_all_overdue_tasks(self):
+        result = await self.session.execute(select(Task).where(Task.status == TaskStatus.OVERDUE))
+        return result.scalars().all()
