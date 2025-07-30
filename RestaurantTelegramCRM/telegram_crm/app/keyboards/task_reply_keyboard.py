@@ -12,6 +12,17 @@ def get_task_action_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
+def get_report_action_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📤 Отправить отчёт")],
+            [KeyboardButton(text="❌ Отменить отправку отчёта")]
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
+
+
 def get_remove_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[],
