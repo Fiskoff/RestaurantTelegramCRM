@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.models import Task
+from core.models import Task, TaskStatus
 
 
 class TaskRepository:
@@ -28,3 +28,12 @@ class TaskRepository:
     async def get_task_by_id(self, task_id: int):
         result = await self.session.execute(select(Task).where(Task.task_id == task_id))
         return result.scalars().first()
+
+    async def update_status_task(self, current_time):
+        stmt = (
+            update(Task)
+            .where(Task.status == TaskStatus.ACTIVE,Task.deadline < current_time)
+            .values(status=TaskStatus.OVERDUE)
+        )
+        result = await self.session.execute(stmt)
+        return result.rowcount
