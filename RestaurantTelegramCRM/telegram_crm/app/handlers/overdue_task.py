@@ -14,9 +14,9 @@ async def get_all_overdue_task_staff(message: Message):
     task_list = []
     for i, task in enumerate(overdue_tasks, 1):
         task_list.append(
-            f"{i}. {task.title}\n"
-            f"   {task.executor_id}\n"
+            f"{i}. Задача: {task.title}\n"
+            f"   Сотрудник: {task.executor_id}\n"
         )
 
-    response = "Список всех работников:\n\n" + "\n\n".join(task_list)
+    response = "Список просроченных задач работников:\n" + "\n".join(task_list)
     await message.answer(response)
