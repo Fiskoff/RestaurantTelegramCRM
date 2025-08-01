@@ -18,8 +18,10 @@ completed_tasks_router = Router()
 class TaskCheckStates(StatesGroup):
     task_id = State()
 
+
 class TaskCheckUpdateStates(StatesGroup):
-    task_id = State()
+    new_description = State()
+    new_deadline = State()
 
 
 @completed_tasks_router.message(TaskCheckStates.task_id, F.text == "✅ Задача закрыта")
