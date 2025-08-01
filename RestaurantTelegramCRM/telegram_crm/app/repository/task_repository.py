@@ -1,8 +1,9 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from core.models import Task, TaskStatus, User
 
@@ -81,3 +82,7 @@ class TaskRepository:
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def delete_task_for_task_id(self, task_id):
+        await self.session.execute(delete(Task).where(Task.task_id == task_id))
+        await self.session.commit()

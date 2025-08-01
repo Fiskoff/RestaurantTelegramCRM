@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery, InputMediaPhoto
 
 from app.services.task_service import TaskService
@@ -14,12 +15,27 @@ from app.keyboards.task_reply_keyboard import get_chek_task_action_keyboard
 completed_tasks_router = Router()
 
 
-@completed_tasks_router.message(F.text == "✅ Задача закрыта")
-async def close_task(message: Message):
+class TaskCheckStates(StatesGroup):
+    task_id = State()
 
+class TaskCheckUpdateStates(StatesGroup):
+    task_id = State()
+
+
+@completed_tasks_router.message(TaskCheckStates.task_id, F.text == "✅ Задача закрыта")
+async def close_task(message: Message, state: FSMContext):
+    task_id_state = await state.get_data()
+    task_id = list(task_id_state.values())[0]
+    await TaskService.delete_task_for_task_id(task_id)
     await message.answer(
-        "Вы закрыли задачу, она считается выполненной\n",
+        f"Вы закрыли задачу!\n"
+        f"Задача считается выполненной, удалена из списка задач\n",
     )
+
+
+@completed_tasks_router.message(TaskCheckStates.task_id, F.text == "📋 Вернуться к списку выполненных задач")
+async def close_check_task(message: Message):
+    await get_completed_task(message)
 
 
 @completed_tasks_router.message(Command("completed_tasks"))
@@ -31,7 +47,7 @@ async def get_completed_task(message: Message):
         return
 
     keyboard = build_completed_tasks_keyboard(completed_tasks)
-    await message.answer("Выберите задачу:", reply_markup=keyboard)
+    await message.answer("Выберите выполненную задачу для проверки:", reply_markup=keyboard)
 
 
 @completed_tasks_router.callback_query(lambda c: c.data and c.data.startswith('select_completed_tasks:'))
@@ -84,6 +100,7 @@ async def get_completed_task_by_id(callback_query: CallbackQuery, state: FSMCont
         "❌ Доработать - результат вас не устроил",
         reply_markup=chek_keyboard
     )
+    await state.set_state(TaskCheckStates.task_id)
     await callback_query.answer()
 
 

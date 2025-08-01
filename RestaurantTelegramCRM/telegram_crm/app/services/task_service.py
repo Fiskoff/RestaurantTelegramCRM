@@ -62,3 +62,9 @@ class TaskService:
             task_repository = TaskRepository(session)
             return await task_repository.get_task_by_id(task_id)
 
+    @staticmethod
+    async def delete_task_for_task_id(task_id: int):
+        async with db_helper.session_factory() as session:
+            task_repository = TaskRepository(session)
+            await task_repository.delete_task_for_task_id(task_id)
+

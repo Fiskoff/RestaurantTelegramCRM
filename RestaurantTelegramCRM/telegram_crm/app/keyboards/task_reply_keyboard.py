@@ -35,7 +35,8 @@ def get_chek_task_action_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="✅ Задача закрыта")],
-            [KeyboardButton(text="❌ Доработать")]
+            [KeyboardButton(text="❌ Доработать")],
+            [KeyboardButton(text="📋 Вернуться к списку выполненных задач")]
         ],
         resize_keyboard=True,
         one_time_keyboard=True
