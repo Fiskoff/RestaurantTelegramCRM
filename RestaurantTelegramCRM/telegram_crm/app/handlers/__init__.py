@@ -4,7 +4,7 @@ from app.handlers.registration_handler import register_router
 from app.handlers.manager_handlers import manager_router
 from app.handlers.create_task_handlers import create_task_router
 from app.handlers.my_tasks_handlers import my_task_router
-from app.handlers.overdue_task import overdue_task
+from app.handlers.overdue_task_handlers import overdue_task
 
 
 all_routers = Router()
