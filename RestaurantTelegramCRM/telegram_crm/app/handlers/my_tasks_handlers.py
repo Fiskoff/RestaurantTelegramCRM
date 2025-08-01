@@ -103,7 +103,7 @@ async def send_report(message: Message, state: FSMContext):
     photos = user_data.get("photos", [])
 
     comment = "\n".join(comments) if comments else None
-    photo_url = photos[0] if photos else None
+    photo_url = ",".join(photos) if photos else None
 
     result = await TaskService.complete_task(task_id, comment, photo_url)
 

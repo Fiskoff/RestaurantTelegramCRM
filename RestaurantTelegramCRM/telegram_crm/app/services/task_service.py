@@ -1,8 +1,7 @@
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from core.db_helper import db_helper
-from core.models import Task
+from core.models import Task, TaskStatus
 from app.repository.task_repository import TaskRepository
 
 
@@ -18,8 +17,14 @@ class TaskService:
     async def get_all_task(telegram_id: int) -> list[Task]:
         async with db_helper.session_factory() as session:
             task_repository = TaskRepository(session)
-            return await task_repository.get_all_task_for_executor(telegram_id)
-
+            tasks =  await task_repository.get_all_task_for_executor(telegram_id)
+            active_and_overdue_tasks = []
+            for task in tasks:
+                if task.status == TaskStatus.COMPLETED:
+                    continue
+                active_and_overdue_tasks.append(task)
+            return active_and_overdue_tasks
+            
     @staticmethod
     async def get_task_by_id(task_id: int) -> Task:
         async with db_helper.session_factory() as session:
@@ -44,3 +49,16 @@ class TaskService:
                     return {"success": False, "message": "Задача не найдена"}
             except Exception as e:
                 return {"success": False, "message": f"Ошибка при завершении задачи: {str(e)}"}
+
+    @staticmethod
+    async def get_completed_tasks() -> list[Task]:
+        async with db_helper.session_factory() as session:
+            completed_tasks = TaskRepository(session)
+            return await completed_tasks.get_completed_tasks()
+
+    @staticmethod
+    async def get_task_by_id_and_staff(task_id: int) -> Task:
+        async with db_helper.session_factory() as session:
+            task_repository = TaskRepository(session)
+            return await task_repository.get_task_by_id(task_id)
+

@@ -67,3 +67,17 @@ class TaskRepository:
         result = await self.session.execute(stmt)
         await self.session.commit()
         return result.rowcount
+
+    async def get_completed_tasks(self):
+        result = await self.session.execute(select(Task).where(Task.status == TaskStatus.COMPLETED))
+        return result.scalars().all()
+
+
+    async def get_task_by_id_and_staff(self, task_id: int):
+        stmt = (
+            select(Task, User)
+            .join(User, Task.executor_id == User.telegram_id)
+            .where(Task.task_id == task_id, Task.executor_id.isnot(None))
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
