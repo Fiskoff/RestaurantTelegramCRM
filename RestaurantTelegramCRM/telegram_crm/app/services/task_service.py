@@ -14,7 +14,7 @@ class TaskService:
             return {"success": True, "message": "Задача создана"}
 
     @staticmethod
-    async def get_all_task(telegram_id: int) -> list[Task]:
+    async def get_tasks_user(telegram_id: int) -> list[Task]:
         async with db_helper.session_factory() as session:
             task_repository = TaskRepository(session)
             tasks =  await task_repository.get_all_task_for_executor(telegram_id)
@@ -67,4 +67,10 @@ class TaskService:
         async with db_helper.session_factory() as session:
             task_repository = TaskRepository(session)
             await task_repository.delete_task_for_task_id(task_id)
+
+    @staticmethod
+    async def get_all_task() -> list[Task]:
+        async with db_helper.session_factory() as session:
+            task_repository = TaskRepository(session)
+            return await task_repository.get_activ_and_overdue_tasks()
 

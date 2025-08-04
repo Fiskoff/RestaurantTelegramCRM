@@ -25,7 +25,7 @@ async def get_my_tasks(message: Message, state: FSMContext):
     await state.clear()
 
     telegram_id = message.from_user.id
-    tasks = await TaskService.get_all_task(telegram_id)
+    tasks = await TaskService.get_tasks_user(telegram_id)
 
     if not tasks:
         await message.answer("У вас пока нет задач.")
@@ -164,7 +164,7 @@ async def handle_photo(message: Message, state: FSMContext):
 
 async def show_tasks_list(message: Message):
     telegram_id = message.from_user.id
-    tasks = await TaskService.get_all_task(telegram_id)
+    tasks = await TaskService.get_tasks_user(telegram_id)
 
     if not tasks:
         await message.answer("У вас пока нет задач.")

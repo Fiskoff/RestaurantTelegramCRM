@@ -41,3 +41,14 @@ def get_chek_task_action_keyboard() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
         one_time_keyboard=True
     )
+
+
+def get_update_task_action_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Изменить задачу")],
+            [KeyboardButton(text="❌ Удалить задачу")],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
