@@ -1,4 +1,4 @@
-import asyncio
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from aiogram import Router, F
@@ -15,27 +15,111 @@ from app.keyboards.task_reply_keyboard import get_chek_task_action_keyboard
 completed_tasks_router = Router()
 
 
-class TaskCheckStates(StatesGroup):
-    task_id = State()
-
-
 class TaskCheckUpdateStates(StatesGroup):
-    new_description = State()
-    new_deadline = State()
+    waiting_for_description = State()
+    waiting_for_deadline = State()
 
 
-@completed_tasks_router.message(TaskCheckStates.task_id, F.text == "✅ Задача закрыта")
-async def close_task(message: Message, state: FSMContext):
-    task_id_state = await state.get_data()
-    task_id = list(task_id_state.values())[0]
-    await TaskService.delete_task_for_task_id(task_id)
-    await message.answer(
-        f"Вы закрыли задачу!\n"
-        f"Задача считается выполненной, удалена из списка задач\n",
+@completed_tasks_router.message(F.text == "❌ Доработать задачу")
+async def start_chek_task(message: Message, state: FSMContext):
+    user_data = await state.get_data()
+    task_id = user_data.get('current_task_id')
+    if not task_id:
+        await message.answer("Ошибка: не удалось найти информацию о задаче. Пожалуйста, начните сначала.")
+        await state.clear()
+        return
+
+    refine_task = await TaskService.get_task_by_id(task_id)
+    if not refine_task:
+        await message.answer("Ошибка: задача не найдена.")
+        await state.clear()
+        return
+
+    await state.update_data(
+        original_task_id=task_id,
+        original_title=refine_task.title,
+        original_description=refine_task.description,
+        original_deadline=refine_task.deadline,
+        original_executor_id=refine_task.executor_id,
+        original_manager_id=refine_task.manager_id
     )
 
+    new_title = f"(Доработать!) {refine_task.title}"
+    await state.update_data(new_title=new_title)
 
-@completed_tasks_router.message(TaskCheckStates.task_id, F.text == "📋 Вернуться к списку выполненных задач")
+    await message.answer(
+        f"Задача будет активна под таким именем: {new_title}\n"
+        f"\n"
+        f"Опишите что нужно исправить:\n"
+    )
+    await state.set_state(TaskCheckUpdateStates.waiting_for_description)
+
+
+@completed_tasks_router.message(TaskCheckUpdateStates.waiting_for_description)
+async def process_new_description(message: Message, state: FSMContext):
+    input_description = message.text
+
+    user_data = await state.get_data()
+    original_description = user_data.get('original_description', '')
+
+    new_description = f"\nПояснение к исправлению:\n{input_description}\n\nСтарое описание:\n{original_description}"
+    await state.update_data(new_description=new_description)
+
+    await message.answer("Укажите дату и время окончания задачи \nВ формате: 01.01.2025 - 22:30")
+    await state.set_state(TaskCheckUpdateStates.waiting_for_deadline)
+
+
+@completed_tasks_router.message(TaskCheckUpdateStates.waiting_for_deadline)
+async def process_new_deadline(message: Message, state: FSMContext):
+    input_deadline = message.text.strip()
+    try:
+        new_deadline = datetime.strptime(input_deadline, "%d.%m.%Y - %H:%M")
+    except ValueError:
+        await message.answer("Неверный формат даты. Пожалуйста, укажите дату и время в формате: 01.01.2025 - 22:30")
+        return
+
+    await state.update_data(new_deadline=new_deadline)
+    user_data = await state.get_data()
+    manager_id = user_data.get('original_manager_id')
+    executor_id = user_data.get('original_executor_id')
+    result = await TaskService.create_new_task(
+        manager_id=manager_id,
+        executor_id=executor_id,
+        title=user_data["new_title"],
+        description=user_data["new_description"],
+        deadline=new_deadline
+    )
+
+    if result['success']:
+        original_task_id = user_data.get('original_task_id')
+        if original_task_id:
+            await TaskService.delete_task_for_task_id(original_task_id)
+        await message.answer("Задача пересоздана!")
+    else:
+        await message.answer(f"Ошибка: {result['message']}")
+
+    await state.clear()
+
+
+@completed_tasks_router.message(F.text == "✅ Задача закрыта")
+async def close_task(message: Message, state: FSMContext):
+    user_data = await state.get_data()
+    task_id = user_data.get('current_task_id')
+
+    if task_id:
+        await TaskService.delete_task_for_task_id(task_id)
+        await message.answer(
+            f"Вы закрыли задачу!\n"
+            f"Задача считается выполненной, удалена из списка задач\n",
+        )
+    else:
+        await message.answer("Ошибка: не удалось найти информацию о задаче.")
+
+    await state.clear()
+    await get_completed_task(message)
+
+
+@completed_tasks_router.message(F.text == "📋 Вернуться к списку выполненных задач")
 async def close_check_task(message: Message):
     await get_completed_task(message)
 
@@ -57,9 +141,14 @@ async def get_completed_task_by_id(callback_query: CallbackQuery, state: FSMCont
     task_id_str = callback_query.data.split(':')[1]
     task_id = int(task_id_str)
 
-    task = await TaskService.get_task_by_id_and_staff(task_id)
 
-    await state.update_data(task_id=task_id)
+    await state.update_data(current_task_id=task_id)
+
+    task = await TaskService.get_task_by_id_and_staff(task_id)
+    if not task:
+        await callback_query.message.answer("Ошибка: задача не найдена.")
+        await callback_query.answer()
+        return
 
     kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
     deadline_with_tz = task.deadline.replace(tzinfo=kemerovo_tz)
@@ -67,6 +156,7 @@ async def get_completed_task_by_id(callback_query: CallbackQuery, state: FSMCont
 
     deadline_str = deadline_with_tz.strftime("%d.%m.%Y %H:%M")
     completed_at_str = completed_at_with_tz.strftime("%d.%m.%Y %H:%M")
+
     response_text = (
         f"«{task.title}»\n"
         f"Описание задачи: {task.description}\n"
@@ -88,7 +178,6 @@ async def get_completed_task_by_id(callback_query: CallbackQuery, state: FSMCont
                 media_group = [InputMediaPhoto(media=url, caption=response_text if i == 0 else None) for i, url in
                                enumerate(photo_urls)]
                 await callback_query.message.answer_media_group(media=media_group)
-
         else:
             await callback_query.message.answer(response_text)
     else:
@@ -99,11 +188,8 @@ async def get_completed_task_by_id(callback_query: CallbackQuery, state: FSMCont
         "Проверьте правильность выпаленного задания\n"
         "Выберите\n"
         "✅ Задача закрыта - вас устраивает полученный результат\n"
-        "❌ Доработать - результат вас не устроил",
+        "❌ Доработать задачу - результат вас не устроил",
         reply_markup=chek_keyboard
     )
-    await state.set_state(TaskCheckStates.task_id)
     await callback_query.answer()
-
-
 
