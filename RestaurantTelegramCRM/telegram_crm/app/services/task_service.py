@@ -74,3 +74,13 @@ class TaskService:
             task_repository = TaskRepository(session)
             return await task_repository.get_activ_and_overdue_tasks()
 
+    @staticmethod
+    async def update_task_field(task_id: int, field: str, new_value) -> dict:
+        async with db_helper.session_factory() as session:
+            task_repository = TaskRepository(session)
+            try:
+                await task_repository.update_task_field(task_id, field, new_value)
+                return {"success": True, "message": "Задача успешно обновлена"}
+            except Exception as e:
+                return {"success": False, "message": f"Ошибка при обновлении задачи: {str(e)}"}
+

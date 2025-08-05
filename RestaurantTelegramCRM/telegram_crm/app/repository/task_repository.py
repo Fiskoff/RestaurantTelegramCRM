@@ -99,3 +99,26 @@ class TaskRepository:
     async  def get_activ_and_overdue_tasks(self):
         result = await self.session.execute(select(Task).where(Task.status != TaskStatus.COMPLETED))
         return result.scalars().all()
+
+    async def update_task_field(self, task_id: int, field: str, new_value):
+        field_mapping = {
+            'title': Task.title,
+            'description': Task.description,
+            'executor': Task.executor_id,
+            'deadline': Task.deadline
+        }
+
+        if field not in field_mapping:
+            raise ValueError(f"Недопустимое поле для обновления: {field}")
+
+        stmt = (
+            update(Task)
+            .where(Task.task_id == task_id)
+            .values({field_mapping[field]: new_value})
+        )
+
+        result = await self.session.execute(stmt)
+        await self.session.commit()
+
+        if result.rowcount == 0:
+            raise ValueError("Задача не найдена")
