@@ -12,6 +12,7 @@ from app.keyboards.task_reply_keyboard import get_update_task_action_keyboard
 from app.services.task_service import TaskService
 from app.services.user_service import UserService
 
+
 change_task_router = Router()
 
 
@@ -33,7 +34,7 @@ async def delete_task(message: Message):
     await message.answer("Выберите задачу для удаления:", reply_markup=task_keyboard)
 
 
-@change_task_router.message(F.text == "Изменить задачу")
+@change_task_router.message(F.text == "✏️ Изменить задачу")
 async def change_task(message: Message, state: FSMContext):
     tasks = await TaskService.get_all_task()
     if not tasks:
@@ -58,7 +59,7 @@ async def start_change_task(callback_query: CallbackQuery, state: FSMContext):
     await state.update_data(task_id=task_id)
 
     task_info = (
-        f"Выбранная задача для изменения:\n\n"
+        f"Задача для изменения:\n\n"
         f"Название: {selected_task.title}\n"
         f"Описание: {selected_task.description}\n"
         f"Сотрудник: {selected_task.executor.full_name} - {selected_task.executor.position}\n"
@@ -98,7 +99,7 @@ async def process_field_choice(message: Message, state: FSMContext):
         'title': 'название задачи',
         'description': 'описание задачи',
         'executor': 'сотрудника (введите Telegram ID)',
-        'deadline': 'дедлайн (в формате ДД.ММ.ГГГГ ЧЧ:ММ)'
+        'deadline': 'дедлайн (в формате 01.01.2025 - 22:30)'
     }
 
     if field == 'executor':

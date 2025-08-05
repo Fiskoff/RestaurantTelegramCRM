@@ -68,7 +68,7 @@ async def get_task_by_id(callback_query: CallbackQuery, state: FSMContext):
 
     deadline_str = deadline_with_tz.strftime("%d.%m.%Y %H:%M")
     response_text = (
-        f"📝 «{task.title}»\n"
+        f"«{task.title}»\n"
         f"📄 Описание задачи: {task.description}\n"
         f"⏰ Дедлайн: {deadline_str}\n"
     )
@@ -125,7 +125,6 @@ async def send_report(message: Message, state: FSMContext):
 
 @my_task_router.message(F.text == "❌ Отменить отправку отчёта")
 async def cancel_report(message: Message, state: FSMContext):
-    # Проверяем, что пользователь находится в нужном состоянии
     current_state = await state.get_state()
     if current_state != TaskCompletionStates.waiting_for_report:
         return
