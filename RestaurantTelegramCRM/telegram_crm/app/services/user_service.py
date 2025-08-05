@@ -26,3 +26,17 @@ class UserService:
         async with db_helper.session_factory() as session:
             user_repository = UserRepository(session)
             return await user_repository.get_all_users()
+
+    @staticmethod
+    async def delete_user(telegram_id: int):
+        async with db_helper.session_factory() as session:
+            user_repository = UserRepository(session)
+            try:
+                deleted_count = await user_repository.delete_user(telegram_id)
+                if deleted_count > 0:
+                    return {"success": True, "message": "Сотрудник успешно удален"}
+                else:
+                    return {"success": False, "message": "Сотрудник не найден"}
+            except Exception as e:
+                print(e)
+                return {"success": False, "message": f"Ошибка при удалении: {str(e)}"}

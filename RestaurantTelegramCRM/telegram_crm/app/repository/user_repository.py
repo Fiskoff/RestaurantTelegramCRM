@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.models.user_model import User
@@ -26,3 +26,8 @@ class UserRepository:
     async def get_all_users(self):
         result = await self.session.execute(select(User))
         return result.scalars().all()
+
+    async def delete_user(self, telegram_id: int):
+        result = await self.session.execute(delete(User).where(User.telegram_id == telegram_id))
+        await self.session.commit()
+        return result.rowcount
