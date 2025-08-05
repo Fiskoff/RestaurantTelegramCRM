@@ -6,7 +6,7 @@ from app.handlers.create_task_handlers import create_task_router
 from app.handlers.my_tasks_handlers import my_task_router
 from app.handlers.overdue_task_handlers import overdue_task
 from app.handlers.completed_tasks_handlers import completed_tasks_router
-from app.handlers.update_task_handlers import change_task_router
+from app.handlers.change_task_handlers import change_task_router
 
 
 all_routers = Router()
