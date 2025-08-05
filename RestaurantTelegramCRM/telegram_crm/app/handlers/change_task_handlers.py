@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
 
-from app.keyboards.delete_task_keyboars import build_delete_tasks_keyboard, build_update_tasks_keyboard
+from app.keyboards.delete_task_keyboars import build_delete_tasks_keyboard
 from app.keyboards.task_reply_keyboard import get_update_task_action_keyboard
 from app.services.task_service import TaskService
 
