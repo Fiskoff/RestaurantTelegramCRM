@@ -7,6 +7,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from core.config import settings
 from app.handlers import all_routers
 from app.middlewares.overdue_checker_middleware import OverdueCheckerMiddleware
+from app.middlewares.access_middleware import CommandAccessMiddleware
 
 
 bot = Bot(settings.tg.token)
@@ -17,6 +18,7 @@ overdue_middleware = OverdueCheckerMiddleware(check_interval=300)
 dispatcher.overdue_middleware = overdue_middleware
 dispatcher.message.middleware(overdue_middleware)
 dispatcher.callback_query.middleware(overdue_middleware)
+dispatcher.message.middleware(CommandAccessMiddleware())
 
 dispatcher.include_router(all_routers)
 
