@@ -6,20 +6,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from core.models import Task, TaskStatus, User
+from core.models.base_model import SectorStatus
 
 
 class TaskRepository:
     def __init__(self, async_session: AsyncSession):
         self.session = async_session
 
-
-    async def create_task(self, manager_id: int, executor_id: int, title: str, description: str, deadline: datetime):
+    async def create_task(self, manager_id: int, executor_id: int, title: str, description: str, deadline: datetime,
+                          sector_task: SectorStatus = None):
         new_task = Task(
             manager_id=manager_id,
             executor_id=executor_id,
             title=title,
             description=description,
-            deadline=deadline
+            deadline=deadline,
+            sector_task=sector_task  # Добавляем сектор
         )
         self.session.add(new_task)
         await self.session.commit()
@@ -56,20 +58,26 @@ class TaskRepository:
         overdue_tasks_with_users = result.all()
         return overdue_tasks_with_users
 
-
-    async def complete_task(self, task_id: int, comment: str = None, photo_url: str = None):
+    async def complete_task(self, task_id: int, comment: str = None, photo_url: str = None, executor_id: int = None):
         kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
         completed_at = datetime.now(kemerovo_tz)
+
+        # Подготавливаем значения для обновления
+        update_values = {
+            'status': TaskStatus.COMPLETED,
+            'completed_at': completed_at,
+            'comment': comment,
+            'photo_url': photo_url
+        }
+
+        # Если передан executor_id, добавляем его в обновляемые значения
+        if executor_id is not None:
+            update_values['executor_id'] = executor_id
 
         stmt = (
             update(Task)
             .where(Task.task_id == task_id)
-            .values(
-                status=TaskStatus.COMPLETED,
-                completed_at=completed_at,
-                comment=comment,
-                photo_url=photo_url
-            )
+            .values(**update_values)
         )
         result = await self.session.execute(stmt)
         await self.session.commit()
@@ -129,4 +137,13 @@ class TaskRepository:
             .join(User, Task.executor_id == User.telegram_id)
         )
         result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_sector_tasks(self, sector: SectorStatus):
+        result = await self.session.execute(
+            select(Task).where(
+                Task.sector_task == sector,
+                Task.status != TaskStatus.COMPLETED
+            )
+        )
         return result.scalars().all()

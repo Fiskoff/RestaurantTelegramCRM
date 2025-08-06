@@ -3,14 +3,16 @@ from datetime import datetime
 from core.db_helper import db_helper
 from core.models import Task, TaskStatus
 from app.repository.task_repository import TaskRepository
+from core.models.base_model import SectorStatus
 
 
 class TaskService:
     @staticmethod
-    async def create_new_task(manager_id: int, executor_id: int, title: str, description: str, deadline: datetime) -> dict:
+    async def create_new_task(manager_id: int, executor_id: int, title: str, description: str, deadline: datetime,
+                              sector_task: SectorStatus = None) -> dict:
         async with db_helper.session_factory() as session:
             task_repository = TaskRepository(session)
-            await task_repository.create_task(manager_id, executor_id, title, description, deadline)
+            await task_repository.create_task(manager_id, executor_id, title, description, deadline, sector_task)
             return {"success": True, "message": "Задача создана"}
 
     @staticmethod
@@ -38,11 +40,11 @@ class TaskService:
             return await task_repository.get_all_overdue_tasks()
 
     @staticmethod
-    async def complete_task(task_id: int, comment: str = None, photo_url: str = None) -> dict:
+    async def complete_task(task_id: int, comment: str = None, photo_url: str = None, executor_id: int = None) -> dict:
         async with db_helper.session_factory() as session:
             task_repository = TaskRepository(session)
             try:
-                result = await task_repository.complete_task(task_id, comment, photo_url)
+                result = await task_repository.complete_task(task_id, comment, photo_url, executor_id)
                 if result > 0:
                     return {"success": True, "message": "Задача успешно завершена"}
                 else:
@@ -90,3 +92,8 @@ class TaskService:
             task_repository = TaskRepository(session)
             return await task_repository.get_staff_tasks()
 
+    @staticmethod
+    async def get_sector_tasks(sector: SectorStatus) -> list[Task]:
+        async with db_helper.session_factory() as session:
+            task_repository = TaskRepository(session)
+            return await task_repository.get_sector_tasks(sector)

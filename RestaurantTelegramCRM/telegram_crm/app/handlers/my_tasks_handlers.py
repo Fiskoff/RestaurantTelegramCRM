@@ -10,7 +10,7 @@ from aiogram.fsm.state import State, StatesGroup
 from app.keyboards.select_all_task_keyboard import format_tasks_list, build_tasks_keyboard
 from app.keyboards.task_reply_keyboard import get_task_action_keyboard, get_report_action_keyboard, get_remove_keyboard
 from app.services.task_service import TaskService
-
+from app.services.user_service import UserService
 
 my_task_router = Router()
 
@@ -23,27 +23,43 @@ class TaskCompletionStates(StatesGroup):
 @my_task_router.message(Command("my_tasks"))
 async def get_my_tasks(message: Message, state: FSMContext):
     await state.clear()
-
     telegram_id = message.from_user.id
-    tasks = await TaskService.get_tasks_user(telegram_id)
 
-    if not tasks:
-        await message.answer("У вас пока нет задач.")
+    user = await UserService.get_user_by_telegram_id(telegram_id)
+    if not user:
+        await message.answer("❌ Пользователь не найден")
+        return
+
+    user_sector = user.sector
+
+    personal_tasks = await TaskService.get_tasks_user(telegram_id)
+
+    sector_tasks = []
+    if user_sector:
+        sector_tasks = await TaskService.get_sector_tasks(user_sector)
+
+    all_tasks = list(personal_tasks)
+    task_ids = {task.task_id for task in personal_tasks}
+
+    for sector_task in sector_tasks:
+        if sector_task.task_id not in task_ids:
+            all_tasks.append(sector_task)
+
+    if not all_tasks:
+        await message.answer("У вас пока нет личных задач")
         return
 
     kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
     current_time = datetime.now(kemerovo_tz)
-    active_tasks = [t for t in tasks if t.deadline.replace(tzinfo=kemerovo_tz) > current_time]
-    overdue_tasks = [t for t in tasks if t.deadline.replace(tzinfo=kemerovo_tz) <= current_time]
-
+    active_tasks = [t for t in all_tasks if t.deadline.replace(tzinfo=kemerovo_tz) > current_time]
+    overdue_tasks = [t for t in all_tasks if t.deadline.replace(tzinfo=kemerovo_tz) <= current_time]
     active_text = format_tasks_list(active_tasks, "🟢 Активные задачи:")
     overdue_text = format_tasks_list(overdue_tasks, "🔴 Просроченные задачи:")
 
     full_text = active_text + "\n" + overdue_text if (active_text or overdue_text) else "Нет задач для отображения."
 
     await message.answer(full_text, parse_mode="HTML")
-
-    keyboard = build_tasks_keyboard(tasks)
+    keyboard = build_tasks_keyboard(all_tasks)
     await message.answer("Выберите задачу:", reply_markup=keyboard)
 
 
@@ -105,7 +121,13 @@ async def send_report(message: Message, state: FSMContext):
     comment = "\n".join(comments) if comments else None
     photo_url = ",".join(photos) if photos else None
 
-    result = await TaskService.complete_task(task_id, comment, photo_url)
+    task = await TaskService.get_task_by_id(task_id)
+
+    executor_id = None
+    if not task.executor_id:
+        executor_id = message.from_user.id
+
+    result = await TaskService.complete_task(task_id, comment, photo_url, executor_id)
 
     if result["success"]:
         await message.answer(

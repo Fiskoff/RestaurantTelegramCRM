@@ -15,3 +15,12 @@ async def create_employee_selection_keyboard() -> InlineKeyboardMarkup:
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     return keyboard
+
+
+def create_sector_selection_keyboard() -> InlineKeyboardMarkup:
+    keyboard = [
+        [InlineKeyboardButton(text="🍸 Бар", callback_data="select_sector:bar")],
+        [InlineKeyboardButton(text="🍽️ Зал", callback_data="select_sector:hall")],
+        [InlineKeyboardButton(text="👨‍🍳 Кухня", callback_data="select_sector:kitchen")]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)

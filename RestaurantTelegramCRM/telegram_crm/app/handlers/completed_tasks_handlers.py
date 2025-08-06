@@ -141,7 +141,6 @@ async def get_completed_task_by_id(callback_query: CallbackQuery, state: FSMCont
     task_id_str = callback_query.data.split(':')[1]
     task_id = int(task_id_str)
 
-
     await state.update_data(current_task_id=task_id)
 
     task = await TaskService.get_task_by_id_and_staff(task_id)
@@ -157,12 +156,17 @@ async def get_completed_task_by_id(callback_query: CallbackQuery, state: FSMCont
     deadline_str = deadline_with_tz.strftime("%d.%m.%Y %H:%M")
     completed_at_str = completed_at_with_tz.strftime("%d.%m.%Y %H:%M")
 
+    if task.executor:
+        executor_info = f"{task.executor.full_name} - {task.executor.position}"
+    else:
+        executor_info = "Исполнитель не назначен"
+
     response_text = (
         f"«{task.title}»\n"
         f"Описание задачи: {task.description}\n"
         f"Дедлайн: {deadline_str}\n"
         f"\n"
-        f"Сотрудник: {task.executor.full_name} - {task.executor.position}\n"
+        f"Сотрудник: {executor_info}\n"
         f"Выполнено: {completed_at_str}\n"
         f"Комментарий к выполненной задачи:\n"
         f"{task.comment or 'Комментарий не был оставлен'}\n"
