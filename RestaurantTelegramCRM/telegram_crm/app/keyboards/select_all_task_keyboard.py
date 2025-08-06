@@ -15,8 +15,8 @@ def format_tasks_list(tasks: list[Task], header: str) -> str:
 
         task_lines.append(
             f"{i}. <b>{task.title}</b>\n"
-            f"   {executor_info}\n"
-            f"   Описание задачи: {task.description}"
+            f"{executor_info}\n"
+            f"Описание задачи: {task.description}\n"
         )
 
     return f"<b>{header}</b>\n" + "\n".join(task_lines) if task_lines else ""
