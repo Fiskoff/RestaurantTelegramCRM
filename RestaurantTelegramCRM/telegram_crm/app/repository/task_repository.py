@@ -122,3 +122,11 @@ class TaskRepository:
 
         if result.rowcount == 0:
             raise ValueError("Задача не найдена")
+
+    async  def get_staff_tasks(self):
+        stmt = (
+            select(Task, User)
+            .join(User, Task.executor_id == User.telegram_id)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()

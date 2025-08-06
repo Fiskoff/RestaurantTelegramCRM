@@ -18,7 +18,7 @@ ACCESS_RULES = {
 
 ALL_PROTECTED_COMMANDS = [
     "start", "create_task", "my_tasks", "all_overdue_task",
-    "completed_tasks", "change_task", "delete_task",
+    "completed_tasks", "change_task", "delete_task", "staff_tasks",
 ]
 
 

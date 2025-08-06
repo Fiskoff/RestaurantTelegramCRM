@@ -7,6 +7,7 @@ from app.handlers.overdue_task_handlers import overdue_task
 from app.handlers.completed_tasks_handlers import completed_tasks_router
 from app.handlers.change_task_handlers import change_task_router
 from app.handlers.delete_user_handlers import delete_user_router
+from app.handlers.staff_tasks_handlers import staff_tasks_router
 
 
 all_routers = Router()
@@ -18,3 +19,4 @@ all_routers.include_router(overdue_task)
 all_routers.include_router(completed_tasks_router)
 all_routers.include_router(change_task_router)
 all_routers.include_router(delete_user_router)
+all_routers.include_router(staff_tasks_router)

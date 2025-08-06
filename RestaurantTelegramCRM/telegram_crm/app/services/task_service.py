@@ -84,3 +84,9 @@ class TaskService:
             except Exception as e:
                 return {"success": False, "message": f"Ошибка при обновлении задачи: {str(e)}"}
 
+    @staticmethod
+    async def get_staff_tasks():
+        async with db_helper.session_factory() as session:
+            task_repository = TaskRepository(session)
+            return await task_repository.get_staff_tasks()
+
