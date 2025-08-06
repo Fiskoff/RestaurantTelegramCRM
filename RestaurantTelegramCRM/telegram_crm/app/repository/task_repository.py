@@ -21,7 +21,7 @@ class TaskRepository:
             title=title,
             description=description,
             deadline=deadline,
-            sector_task=sector_task  # Добавляем сектор
+            sector_task=sector_task
         )
         self.session.add(new_task)
         await self.session.commit()
@@ -62,7 +62,6 @@ class TaskRepository:
         kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
         completed_at = datetime.now(kemerovo_tz)
 
-        # Подготавливаем значения для обновления
         update_values = {
             'status': TaskStatus.COMPLETED,
             'completed_at': completed_at,
@@ -70,7 +69,6 @@ class TaskRepository:
             'photo_url': photo_url
         }
 
-        # Если передан executor_id, добавляем его в обновляемые значения
         if executor_id is not None:
             update_values['executor_id'] = executor_id
 
@@ -112,8 +110,9 @@ class TaskRepository:
         field_mapping = {
             'title': Task.title,
             'description': Task.description,
-            'executor': Task.executor_id,
-            'deadline': Task.deadline
+            'executor_id': Task.executor_id,
+            'deadline': Task.deadline,
+            'sector_task': Task.sector_task
         }
 
         if field not in field_mapping:
@@ -132,11 +131,10 @@ class TaskRepository:
             raise ValueError("Задача не найдена")
 
     async def get_staff_tasks(self):
-        # Получаем все задачи, которые либо назначены сотрудникам, либо секторам
         stmt = select(Task).where(
             or_(
-                Task.executor_id.isnot(None),  # Задачи с назначенным исполнителем
-                Task.sector_task.isnot(None)  # Задачи для секторов
+                Task.executor_id.isnot(None),
+                Task.sector_task.isnot(None)
             )
         )
         result = await self.session.execute(stmt)

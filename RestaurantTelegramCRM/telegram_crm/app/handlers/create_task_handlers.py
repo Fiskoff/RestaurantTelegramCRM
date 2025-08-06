@@ -16,9 +16,9 @@ create_task_router = Router()
 
 
 class CreateTask(StatesGroup):
-    waiting_for_assignment_type = State()  # Новый стейт для выбора типа назначения
+    waiting_for_assignment_type = State()
     waiting_for_executor_id = State()
-    waiting_for_sector = State()  # Новый стейт для выбора сектора
+    waiting_for_sector = State()
     waiting_for_title = State()
     waiting_for_description = State()
     waiting_for_deadline = State()
@@ -29,11 +29,11 @@ async def start_create_task(message: Message, state: FSMContext):
     manager_id = message.from_user.id
     await state.update_data(manager_id=manager_id)
 
-    # Предлагаем выбрать тип назначения задачи
     await message.answer(
         "Как вы хотите назначить задачу?\n"
         "1 - Конкретному сотруднику\n"
-        "2 - Всему сектору"
+        "2 - Всему сектору\n"
+        "3 - Отменить создание задачи"
     )
     await state.set_state(CreateTask.waiting_for_assignment_type)
 
@@ -41,20 +41,22 @@ async def start_create_task(message: Message, state: FSMContext):
 @create_task_router.message(CreateTask.waiting_for_assignment_type)
 async def process_assignment_type(message: Message, state: FSMContext):
     if message.text == "1":
-        # Назначение конкретному сотруднику
         keyboard = await create_employee_selection_keyboard()
         await message.answer("Выберите сотрудника, которому хотите назначить задачу:", reply_markup=keyboard)
         await state.set_state(CreateTask.waiting_for_executor_id)
     elif message.text == "2":
-        # Назначение всему сектору
         keyboard = create_sector_selection_keyboard()
         await message.answer("Выберите сектор, которому хотите назначить задачу:", reply_markup=keyboard)
         await state.set_state(CreateTask.waiting_for_sector)
+    elif message.text == "3":
+        await message.answer("Создание задачи, отменено!")
+        await state.clear()
     else:
         await message.answer(
             "Пожалуйста, выберите тип назначения:\n"
             "1 - Конкретному сотруднику\n"
-            "2 - Всему сектору"
+            "2 - Всему сектору\n"
+            "3 - Отменить создание задачи"
         )
 
 
@@ -68,7 +70,7 @@ async def process_employee_selection(callback_query: CallbackQuery, state: FSMCo
         return
 
     await state.update_data(executor_id=executor_id)
-    await state.update_data(sector_task=None)  # Явно указываем, что сектор не выбран
+    await state.update_data(sector_task=None)
     await callback_query.answer()
     await callback_query.message.answer("Напишите название задачи")
     await state.set_state(CreateTask.waiting_for_title)
@@ -78,7 +80,6 @@ async def process_employee_selection(callback_query: CallbackQuery, state: FSMCo
 async def process_sector_selection(callback_query: CallbackQuery, state: FSMContext):
     try:
         sector_str = callback_query.data.split(':')[1]
-        # Преобразуем строку в значение Enum
         sector_map = {
             "bar": SectorStatus.BAR,
             "hall": SectorStatus.HALL,
@@ -91,7 +92,7 @@ async def process_sector_selection(callback_query: CallbackQuery, state: FSMCont
             return
 
         await state.update_data(sector_task=sector)
-        await state.update_data(executor_id=None)  # Явно указываем, что сотрудник не выбран
+        await state.update_data(executor_id=None)
         await callback_query.answer()
         await callback_query.message.answer("Напишите название задачи")
         await state.set_state(CreateTask.waiting_for_title)
@@ -104,7 +105,7 @@ async def process_sector_selection(callback_query: CallbackQuery, state: FSMCont
 async def process_executor(message: Message, state: FSMContext):
     executor_id = message.text.strip()
     await state.update_data(executor_id=executor_id)
-    await state.update_data(sector_task=None)  # Явно указываем, что сектор не выбран
+    await state.update_data(sector_task=None)
     await message.answer("Напишите название задачи")
     await state.set_state(CreateTask.waiting_for_title)
 
@@ -131,7 +132,6 @@ async def process_deadline(message: Message, state: FSMContext):
 
     try:
         deadline_dt = datetime.strptime(deadline, "%d.%m.%Y - %H:%M")
-        # Добавляем временную зону
         kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
         deadline_dt = deadline_dt.replace(tzinfo=kemerovo_tz)
     except ValueError:
@@ -141,7 +141,6 @@ async def process_deadline(message: Message, state: FSMContext):
     await state.update_data(deadline=deadline_dt)
     data = await state.get_data()
 
-    # Определяем параметры для создания задачи
     manager_id = data["manager_id"]
     executor_id = data.get("executor_id")
     sector_task = data.get("sector_task")
@@ -154,7 +153,7 @@ async def process_deadline(message: Message, state: FSMContext):
         title=title,
         description=description,
         deadline=deadline_dt,
-        sector_task=sector_task  # Передаем сектор, если задача для сектора
+        sector_task=sector_task
     )
 
     await state.clear()

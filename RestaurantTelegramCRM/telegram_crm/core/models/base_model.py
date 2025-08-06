@@ -19,6 +19,6 @@ class TaskStatus(Enum):
 
 
 class SectorStatus(Enum):
-    BAR = "bar"
-    HALL = "hall"
-    KITCHEN = "kitchen"
+    BAR = "BAR"
+    HALL = "HALL"
+    KITCHEN = "KITCHEN"

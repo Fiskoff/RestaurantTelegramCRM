@@ -81,7 +81,14 @@ class TaskService:
         async with db_helper.session_factory() as session:
             task_repository = TaskRepository(session)
             try:
-                await task_repository.update_task_field(task_id, field, new_value)
+                if field == 'executor':
+                    await task_repository.update_task_field(task_id, 'executor_id', new_value)
+                    await task_repository.update_task_field(task_id, 'sector_task', None)
+                elif field == 'sector_task':
+                    await task_repository.update_task_field(task_id, 'sector_task', new_value)
+                    await task_repository.update_task_field(task_id, 'executor_id', None)
+                else:
+                    await task_repository.update_task_field(task_id, field, new_value)
                 return {"success": True, "message": "Задача успешно обновлена"}
             except Exception as e:
                 return {"success": False, "message": f"Ошибка при обновлении задачи: {str(e)}"}

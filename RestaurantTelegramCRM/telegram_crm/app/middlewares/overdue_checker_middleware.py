@@ -10,6 +10,7 @@ from aiogram.types import TelegramObject
 from app.repository.task_repository import TaskRepository
 from core.db_helper import db_helper
 
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

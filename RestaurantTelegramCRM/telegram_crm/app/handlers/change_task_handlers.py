@@ -7,10 +7,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
 
-from app.keyboards.delete_task_keyboars import build_delete_tasks_keyboard, build_update_tasks_keyboard
+from app.keyboards.change_task_keyboars import build_delete_tasks_keyboard, build_update_tasks_keyboard
 from app.keyboards.task_reply_keyboard import get_update_task_action_keyboard
 from app.services.task_service import TaskService
 from app.services.user_service import UserService
+from core.models import SectorStatus
 
 
 change_task_router = Router()
@@ -25,6 +26,7 @@ class UpdateTaskStates(StatesGroup):
     waiting_for_field_choice = State()
     waiting_for_new_value = State()
     waiting_for_continue = State()
+    waiting_for_sector_choice = State()
 
 
 @change_task_router.message(F.text == "❌ Удалить задачу")
@@ -40,7 +42,6 @@ async def change_task(message: Message, state: FSMContext):
     if not tasks:
         await message.answer("Нет задач для изменения")
         return
-
     task_keyboard = build_update_tasks_keyboard(tasks)
     await message.answer("Выберите задачу для изменения:", reply_markup=task_keyboard)
     await state.set_state(UpdateTaskStates.waiting_for_field_choice)
@@ -50,19 +51,30 @@ async def change_task(message: Message, state: FSMContext):
 async def start_change_task(callback_query: CallbackQuery, state: FSMContext):
     task_id_str = callback_query.data.split(':')[1]
     task_id = int(task_id_str)
-
     selected_task = await TaskService.get_task_by_id(task_id)
-
     kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
     deadline_with_tz = selected_task.deadline.replace(tzinfo=kemerovo_tz)
-
     await state.update_data(task_id=task_id)
 
+    if selected_task.executor:
+        executor_info = f"{selected_task.executor.full_name} - {selected_task.executor.position}"
+    else:
+        if selected_task.sector_task:
+            sector_names = {
+                SectorStatus.BAR: "Бар",
+                SectorStatus.HALL: "Зал",
+                SectorStatus.KITCHEN: "Кухня"
+            }
+            sector_name = sector_names.get(selected_task.sector_task, str(selected_task.sector_task))
+            executor_info = f"Весь сектор ({sector_name})"
+        else:
+            executor_info = "Исполнитель не назначен"
+
     task_info = (
-        f"Задача для изменения:\n\n"
+        f"Задача для изменения:\n"
         f"Название: {selected_task.title}\n"
         f"Описание: {selected_task.description}\n"
-        f"Сотрудник: {selected_task.executor.full_name} - {selected_task.executor.position}\n"
+        f"Исполнитель: {executor_info}\n"
         f"Дедлайн: {deadline_with_tz.strftime('%d.%m.%Y - %H:%M')}\n"
     )
 
@@ -73,6 +85,8 @@ async def start_change_task(callback_query: CallbackQuery, state: FSMContext):
         "2 - Описание\n"
         "3 - Сотрудник\n"
         "4 - Дедлайн\n"
+        "5 - Назначить сектору (снять с сотрудника)\n"
+        "6 - Отмена\n"
         "Отправьте подходящее число"
     )
     await state.set_state(UpdateTaskStates.waiting_for_field_choice)
@@ -85,43 +99,169 @@ async def process_field_choice(message: Message, state: FSMContext):
         '1': 'title',
         '2': 'description',
         '3': 'executor',
-        '4': 'deadline'
+        '4': 'deadline',
+        '5': 'sector_assignment',  # Новая опция
+        '6': 'cancel'  # Опция отмены
     }
 
     if message.text not in field_map:
-        await message.answer("Пожалуйста, введите число от 1 до 4")
+        await message.answer("Пожалуйста, введите число от 1 до 6")
         return
 
     field = field_map[message.text]
     await state.update_data(field_to_update=field)
 
-    field_names = {
-        'title': 'название задачи',
-        'description': 'описание задачи',
-        'executor': 'сотрудника (введите Telegram ID)',
-        'deadline': 'дедлайн (в формате 01.01.2025 - 22:30)'
+    if field == 'cancel':
+        await message.answer("Редактирование задачи отменено.")
+        await state.clear()
+        await show_all_tasks(message)
+        return
+    elif field == 'sector_assignment':
+        sector_keyboard = create_sector_selection_keyboard()
+        await message.answer("Выберите сектор, которому хотите назначить задачу:", reply_markup=sector_keyboard)
+        await state.set_state(UpdateTaskStates.waiting_for_sector_choice)
+    else:
+        field_names = {
+            'title': 'название задачи',
+            'description': 'описание задачи',
+            'executor': 'сотрудника (введите Telegram ID)',
+            'deadline': 'дедлайн (в формате 01.01.2025 - 22:30)'
+        }
+
+        if field == 'executor':
+            employees = await UserService.get_all_users()
+            if employees:
+                employee_list = "\n".join([
+                    f"{emp.telegram_id} - {emp.full_name} ({emp.position})"
+                    for emp in employees
+                ])
+                await message.answer(
+                    f"Введите Telegram ID сотрудника для изменения:\n"
+                    f"Список сотрудников:\n{employee_list}"
+                )
+            else:
+                await message.answer("Введите Telegram ID нового сотрудника:")
+        elif field == 'deadline':
+            await message.answer("Введите новую дату дедлайна в формате 01.01.2025 - 22:30")
+        else:
+            field_name = field_names[field]
+            await message.answer(f"Введите новое {field_name}:")
+        await state.set_state(UpdateTaskStates.waiting_for_new_value)
+
+
+async def show_all_tasks(message: Message):
+    tasks = await TaskService.get_all_task()
+    if not tasks:
+        await message.answer("Нет задач для изменения")
+        return
+
+    task_keyboard = build_update_tasks_keyboard(tasks)
+    await message.answer("Выберите задачу для изменения:", reply_markup=task_keyboard)
+
+
+def create_sector_selection_keyboard():
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    keyboard = [
+        [InlineKeyboardButton(text="🍸 Бар", callback_data="sector:bar")],
+        [InlineKeyboardButton(text="🍽️ Зал", callback_data="sector:hall")],
+        [InlineKeyboardButton(text="👨‍🍳 Кухня", callback_data="sector:kitchen")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="sector:cancel")]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+@change_task_router.callback_query(UpdateTaskStates.waiting_for_sector_choice)
+async def process_sector_choice(callback_query: CallbackQuery, state: FSMContext):
+    user_data = await state.get_data()
+    task_id = user_data.get('task_id')
+
+    if callback_query.data == "sector:cancel":
+        await callback_query.message.answer("Назначение сектору отменено.")
+        await state.set_state(UpdateTaskStates.waiting_for_field_choice)
+        selected_task = await TaskService.get_task_by_id(task_id)
+        kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
+        deadline_with_tz = selected_task.deadline.replace(tzinfo=kemerovo_tz)
+
+        if selected_task.executor:
+            executor_info = f"{selected_task.executor.full_name} - {selected_task.executor.position}"
+        else:
+            if selected_task.sector_task:
+                sector_names = {
+                    SectorStatus.BAR: "Бар",
+                    SectorStatus.HALL: "Зал",
+                    SectorStatus.KITCHEN: "Кухня"
+                }
+                sector_name = sector_names.get(selected_task.sector_task, str(selected_task.sector_task))
+                executor_info = f"Весь сектор ({sector_name})"
+            else:
+                executor_info = "Исполнитель не назначен"
+
+        task_info = (
+            f"Задача для изменения:\n"
+            f"Название: {selected_task.title}\n"
+            f"Описание: {selected_task.description}\n"
+            f"Исполнитель: {executor_info}\n"
+            f"Дедлайн: {deadline_with_tz.strftime('%d.%m.%Y - %H:%M')}\n"
+        )
+
+        await callback_query.message.answer(task_info)
+        await callback_query.message.answer(
+            "Что вы хотите изменить?\n"
+            "1 - Название\n"
+            "2 - Описание\n"
+            "3 - Сотрудник\n"
+            "4 - Дедлайн\n"
+            "5 - Назначить сектору (снять с сотрудника)\n"
+            "6 - Отмена\n"
+            "Отправьте подходящее число"
+        )
+        await callback_query.answer()
+        return
+
+    sector_map = {
+        "sector:bar": SectorStatus.BAR,
+        "sector:hall": SectorStatus.HALL,
+        "sector:kitchen": SectorStatus.KITCHEN
     }
 
-    if field == 'executor':
-        employees = await UserService.get_all_users()
-        if employees:
-            employee_list = "\n".join([
-                f"{emp.telegram_id} - {emp.full_name} ({emp.position})"
-                for emp in employees
-            ])
-            await message.answer(
-                f"Введите Telegram ID сотрудника для изменения:\n\n"
-                f"Список сотрудников:\n{employee_list}"
-            )
-        else:
-            await message.answer("Введите Telegram ID нового сотрудника:")
-    elif field == 'deadline':
-        await message.answer("Введите новую дату дедлайна в формате 01.01.2025 - 22:30")
-    else:
-        field_name = field_names[field]
-        await message.answer(f"Введите новое {field_name}:")
+    sector = sector_map.get(callback_query.data)
 
-    await state.set_state(UpdateTaskStates.waiting_for_new_value)
+    if not sector:
+        await callback_query.answer("Ошибка при выборе сектора.", show_alert=True)
+        return
+
+    result = await TaskService.update_task_field(task_id, 'sector_task', sector)  # Передаем Enum
+
+    if result["success"]:
+        updated_task = await TaskService.get_task_by_id(task_id)
+        kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
+        deadline_with_tz = updated_task.deadline.replace(tzinfo=kemerovo_tz)
+
+        sector_names = {
+            SectorStatus.BAR: "Бар",
+            SectorStatus.HALL: "Зал",
+            SectorStatus.KITCHEN: "Кухня"
+        }
+        sector_name = sector_names.get(sector, str(sector))
+
+        await callback_query.message.answer(
+            f"Задача успешно переназначена!\n"
+            f"Название: {updated_task.title}\n"
+            f"Описание: {updated_task.description}\n"
+            f"Исполнитель: Весь сектор ({sector_name})\n"
+            f"Дедлайн: {deadline_with_tz}\n"
+        )
+
+        await callback_query.message.answer(
+            "Хотите изменить что-то еще в этой задаче?\n"
+            "Введите 'да' для продолжения или 'нет' для завершения"
+        )
+        await state.set_state(UpdateTaskStates.waiting_for_continue)
+    else:
+        await callback_query.message.answer(f"Ошибка при переназначении задачи: {result['message']}")
+        await state.clear()
+
+    await callback_query.answer()
 
 
 @change_task_router.message(UpdateTaskStates.waiting_for_new_value)
@@ -149,6 +289,7 @@ async def process_new_value(message: Message, state: FSMContext):
                 if not employee:
                     await message.answer("Сотрудник с таким Telegram ID не найден")
                     return
+                await TaskService.update_task_field(task_id, 'sector_task', None)
             except ValueError:
                 await message.answer("Введите корректный Telegram ID (число)")
                 return
@@ -168,12 +309,28 @@ async def process_new_value(message: Message, state: FSMContext):
             kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
             deadline_with_tz = updated_task.deadline.replace(tzinfo=kemerovo_tz)
 
+            formatted_deadline = deadline_with_tz.strftime("%d.%m.%Y - %H:%M")
+
+            if updated_task.executor:
+                executor_info = f"{updated_task.executor.full_name} - {updated_task.executor.position}"
+            else:
+                if updated_task.sector_task:
+                    sector_names = {
+                        SectorStatus.BAR: "Бар",
+                        SectorStatus.HALL: "Зал",
+                        SectorStatus.KITCHEN: "Кухня"
+                    }
+                    sector_name = sector_names.get(updated_task.sector_task, str(updated_task.sector_task))
+                    executor_info = f"Весь сектор ({sector_name})"
+                else:
+                    executor_info = "Исполнитель не назначен"
+
             await message.answer(
-                f"Задача успешно обновлена!\n\n"
+                f"Задача успешно обновлена!\n"
                 f"Название: {updated_task.title}\n"
                 f"Описание: {updated_task.description}\n"
-                f"Сотрудник: {updated_task.executor.full_name} - {updated_task.executor.position}\n"
-                f"Дедлайн: {deadline_with_tz}\n"
+                f"Исполнитель: {executor_info}\n"
+                f"Дедлайн: {formatted_deadline}\n"
             )
 
             await message.answer(
@@ -200,11 +357,25 @@ async def process_continue_editing(message: Message, state: FSMContext):
         kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
         deadline_with_tz = selected_task.deadline.replace(tzinfo=kemerovo_tz)
 
+        if selected_task.executor:
+            executor_info = f"{selected_task.executor.full_name} - {selected_task.executor.position}"
+        else:
+            if selected_task.sector_task:
+                sector_names = {
+                    SectorStatus.BAR: "Бар",
+                    SectorStatus.HALL: "Зал",
+                    SectorStatus.KITCHEN: "Кухня"
+                }
+                sector_name = sector_names.get(selected_task.sector_task, str(selected_task.sector_task))
+                executor_info = f"Весь сектор ({sector_name})"
+            else:
+                executor_info = "Исполнитель не назначен"
+
         task_info = (
-            f"Задача для изменения:\n\n"
+            f"Задача для изменения:\n"
             f"Название: {selected_task.title}\n"
             f"Описание: {selected_task.description}\n"
-            f"Сотрудник: {selected_task.executor.full_name} - {selected_task.executor.position}\n"
+            f"Исполнитель: {executor_info}\n"
             f"Дедлайн: {deadline_with_tz.strftime('%d.%m.%Y - %H:%M')}\n"
         )
 
@@ -215,6 +386,7 @@ async def process_continue_editing(message: Message, state: FSMContext):
             "2 - Описание\n"
             "3 - Сотрудник\n"
             "4 - Дедлайн\n"
+            "5 - Назначить сектору (снять с сотрудника)\n"
             "Отправьте подходящее число"
         )
         await state.set_state(UpdateTaskStates.waiting_for_field_choice)
@@ -232,22 +404,35 @@ async def process_continue_editing(message: Message, state: FSMContext):
 async def start_delete_task(callback_query: CallbackQuery, state: FSMContext):
     task_id_str = callback_query.data.split(':')[1]
     task_id = int(task_id_str)
-
     selected_task = await TaskService.get_task_by_id(task_id)
-
     kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
     deadline_with_tz = selected_task.deadline.replace(tzinfo=kemerovo_tz)
+
+    if selected_task.executor:
+        executor_info = f"{selected_task.executor.full_name} - {selected_task.executor.position}"
+    else:
+        if selected_task.sector_task:
+            sector_names = {
+                SectorStatus.BAR: "Бар",
+                SectorStatus.HALL: "Зал",
+                SectorStatus.KITCHEN: "Кухня"
+            }
+            sector_name = sector_names.get(selected_task.sector_task, str(selected_task.sector_task))
+            executor_info = f"Весь сектор ({sector_name})"
+        else:
+            executor_info = "Исполнитель не назначен"
+
     await callback_query.message.answer(
         f"Название: {selected_task.title}\n"
         f"Описание: {selected_task.description}\n"
-        f"Сотрудник: {selected_task.executor.full_name} - {selected_task.executor.position}\n"
-        f"Дедланй: {deadline_with_tz}\n"
+        f"Исполнитель: {executor_info}\n"
+        f"Дедлайн: {deadline_with_tz}\n"
     )
     await callback_query.message.answer(
-        "Подведите удаление задачи"
-        "\nОтправите:"
-        "\nда - если уверены"
-        "\nнет - если хотите отменить удаление"
+        "Подтвердите удаление задачи\n"
+        "Отправите:\n"
+        "да - если уверены\n"
+        "нет - если хотите отменить удаление"
     )
     await state.update_data(waiting_for_task_id=selected_task.task_id)
     await state.set_state(TaskDeleteUpdateStates.waiting_for_confirmation)
@@ -267,10 +452,10 @@ async def process_delete_task(message: Message, state: FSMContext):
         await message.answer("Задача не была удалена")
     else:
         await message.answer(
-            "Ошибка ввода"
-            "\nОтправите:"
-            "\nда - если уверены"
-            "\nнет - если хотите отменить удаление"
+            "Ошибка ввода\n"
+            "Отправите:\n"
+            "да - если уверены\n"
+            "нет - если хотите отменить удаление"
         )
     await state.clear()
 

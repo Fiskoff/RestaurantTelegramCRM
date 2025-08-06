@@ -1,6 +1,6 @@
 from sqlalchemy.orm import configure_mappers
 
-from .base_model import BaseModel, UserRole, TaskStatus
+from .base_model import BaseModel, UserRole, TaskStatus, SectorStatus
 from .user_model import User
 from .task_model import Task
 

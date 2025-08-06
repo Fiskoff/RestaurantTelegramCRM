@@ -4,7 +4,7 @@ from aiogram.types import Message
 
 from app.services.task_service import TaskService
 from core.models.base_model import TaskStatus
-from core.models.base_model import SectorStatus  # Убедитесь, что импортируете SectorStatus
+from core.models.base_model import SectorStatus
 
 
 staff_tasks_router = Router()
@@ -15,7 +15,6 @@ async def get_staff_task(message: Message):
     staff_tasks = await TaskService.get_staff_tasks()
     temp_list = []
 
-    # Словарь для преобразования значений сектора в читаемый формат
     sector_names = {
         SectorStatus.BAR: "Бар",
         SectorStatus.HALL: "Зал",
@@ -23,15 +22,12 @@ async def get_staff_task(message: Message):
     }
 
     for i, task in enumerate(staff_tasks, 1):
-        # Определяем информацию об исполнителе
         if task.executor:
             executor_info = f"{task.executor.full_name}-{task.executor.position}"
         else:
-            # Если исполнитель не назначен, значит задача для сектора
             sector_name = sector_names.get(task.sector_task, "Неизвестный сектор")
             executor_info = f"Весь сектор ({sector_name})"
 
-        # Определяем статус задачи
         if task.status == TaskStatus.COMPLETED:
             status_text = "✅ Выполнена"
         elif task.status == TaskStatus.OVERDUE:
