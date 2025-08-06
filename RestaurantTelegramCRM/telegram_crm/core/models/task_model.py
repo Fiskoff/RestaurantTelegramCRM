@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import Integer, Text, DateTime, ForeignKey, BigInteger, String, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from core.models.base_model import BaseModel, TaskStatus
+from core.models.base_model import BaseModel, TaskStatus, SectorStatus
 from core.models.user_model import User
 
 
@@ -20,6 +20,7 @@ class Task(BaseModel):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sector_task: Mapped[SectorStatus | None] = mapped_column(Enum(SectorStatus), nullable=True)
 
     executor_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.telegram_id"), nullable=True)
     manager_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id"), nullable=False)

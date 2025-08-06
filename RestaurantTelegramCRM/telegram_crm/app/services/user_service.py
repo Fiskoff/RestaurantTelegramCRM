@@ -1,7 +1,7 @@
 from core.db_helper import db_helper
 from app.repository.user_repository import UserRepository
 from core.models import User
-from core.models.base_model import UserRole
+from core.models.base_model import UserRole, SectorStatus
 
 
 class UserService:
@@ -12,12 +12,12 @@ class UserService:
             return await user_repository.get_user(telegram_id)
 
     @staticmethod
-    async def create_new_user(telegram_id: int, full_name: str, role: UserRole, position: str) -> dict:
+    async def create_new_user(telegram_id: int, full_name: str, role: UserRole, position: str, sector: SectorStatus) -> dict:
         async with db_helper.session_factory() as session:
             user_repository = UserRepository(session)
             user = await user_repository.get_user(telegram_id)
             if user is None:
-                await user_repository.create_user(telegram_id, full_name, role, position)
+                await user_repository.create_user(telegram_id, full_name, role, position, sector)
                 return {"success": True, "message": "Пользователь успешно создан"}
             return {"success": False, "message": "Пользователь уже существует"}
 

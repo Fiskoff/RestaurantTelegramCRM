@@ -16,3 +16,9 @@ class TaskStatus(Enum):
     ACTIVE = "active"
     COMPLETED = "completed"
     OVERDUE = "overdue"
+
+
+class SectorStatus(Enum):
+    BAR = "bar"
+    HALL = "hall"
+    KITCHEN = "kitchen"

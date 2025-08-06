@@ -1,7 +1,7 @@
 from sqlalchemy import String, BigInteger, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from core.models.base_model import BaseModel, UserRole
+from core.models.base_model import BaseModel, UserRole, SectorStatus
 
 
 class User(BaseModel):
@@ -11,6 +11,7 @@ class User(BaseModel):
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.STAFF, index=True, nullable=False)
     position: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    sector: Mapped[SectorStatus | None] = mapped_column(Enum(SectorStatus), nullable=True)
 
 
     managed_tasks = relationship(

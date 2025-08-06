@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from app.services.user_service import UserService
-from core.models.base_model import UserRole
+from core.models.base_model import UserRole, SectorStatus
 
 
 register_router = Router()
@@ -15,6 +15,7 @@ class Registration(StatesGroup):
     waiting_for_full_name = State()
     waiting_for_role = State()
     waiting_for_position = State()
+    waiting_for_sector = State()
 
 
 @register_router.message(CommandStart())
@@ -61,6 +62,26 @@ async def process_role(message: Message, state: FSMContext):
         return
 
     await state.update_data(role=role_mapping[user_input])
+    await message.answer("Укажите рабочую зону\nОтправьте число:\n 1 - Бар\n 2 - Зал\n 3 - Кухня\n 4 - Нет рабочей зоны")
+    await state.set_state(Registration.waiting_for_sector)
+
+
+@register_router.message(Registration.waiting_for_sector)
+async def process_se(message: Message, state: FSMContext):
+    sector_mapping = {
+        1: SectorStatus.BAR,
+        2: SectorStatus.HALL,
+        3: SectorStatus.KITCHEN,
+        4: None,
+    }
+    user_input = int(message.text.strip())
+    if user_input not in sector_mapping:
+        await message.answer(
+            "Неизвестный сектор. Пожалуйста, выберите из списка:\n"
+            "1 - Бар\n2 - Зал\n3 - Кухня\n4 - Нет рабочей зоны"
+        )
+        return
+    await state.update_data(sector=sector_mapping[user_input])
     await message.answer("Отлично! Теперь укажите вашу должность:")
     await state.set_state(Registration.waiting_for_position)
 
@@ -77,7 +98,8 @@ async def process_position(message: Message, state: FSMContext):
         telegram_id=data['telegram_id'],
         full_name=data['full_name'],
         role=data['role'],
-        position=position
+        position=position,
+        sector=data['sector']
     )
     await state.clear()
 

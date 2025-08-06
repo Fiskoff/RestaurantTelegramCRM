@@ -10,14 +10,12 @@ from core.models.base_model import UserRole
 ROLE_STAFF = "STAFF"
 ROLE_MANAGER = "MANAGER"
 
-
 ACCESS_RULES = {
-    ROLE_STAFF: ["start", "my_tasks"],
+    ROLE_STAFF: ["my_tasks"],
 }
 
-
 ALL_PROTECTED_COMMANDS = [
-    "start", "create_task", "my_tasks", "all_overdue_task",
+    "create_task", "my_tasks", "all_overdue_task",
     "completed_tasks", "change_task", "delete_task", "staff_tasks",
 ]
 
@@ -37,8 +35,11 @@ class CommandAccessMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         command = event.text[1:].split()[0]
-        user_telegram_id = event.from_user.id
 
+        if command == "start":
+            return await handler(event, data)
+
+        user_telegram_id = event.from_user.id
 
         try:
             user = await UserService.get_user_by_telegram_id(user_telegram_id)
@@ -47,7 +48,6 @@ class CommandAccessMiddleware(BaseMiddleware):
             print(f"Ошибка при загрузке пользователя {user_telegram_id}: {e}")
             await event.answer("❌ Ошибка проверки прав доступа. Попробуйте позже.")
             return
-
 
         if not user:
             await event.answer(
