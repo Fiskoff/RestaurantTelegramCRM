@@ -4,6 +4,7 @@ from aiogram.types import Message
 
 from app.services.task_service import TaskService
 from core.models.base_model import TaskStatus
+from core.models.base_model import SectorStatus  # Убедитесь, что импортируете SectorStatus
 
 
 staff_tasks_router = Router()
@@ -13,12 +14,35 @@ staff_tasks_router = Router()
 async def get_staff_task(message: Message):
     staff_tasks = await TaskService.get_staff_tasks()
     temp_list = []
+
+    # Словарь для преобразования значений сектора в читаемый формат
+    sector_names = {
+        SectorStatus.BAR: "Бар",
+        SectorStatus.HALL: "Зал",
+        SectorStatus.KITCHEN: "Кухня"
+    }
+
     for i, task in enumerate(staff_tasks, 1):
-        if task.status == TaskStatus.COMPLETED:
-            temp_list.append(f"{i}. {task.executor.full_name}-{task.executor.position}:\n(✅ Выполнена) {task.title}\n{task.description}\n\n")
-        elif task.status == TaskStatus.OVERDUE:
-            temp_list.append(f"{i}. {task.executor.full_name}-{task.executor.position}:\n(❌ Просрочена) {task.title}\n{task.description}\n\n")
+        # Определяем информацию об исполнителе
+        if task.executor:
+            executor_info = f"{task.executor.full_name}-{task.executor.position}"
         else:
-            temp_list.append(f"{i}. {task.executor.full_name}-{task.executor.position}:\n(⏳ В работе) {task.title}\n{task.description}\n\n")
-    tasks_str = "\n".join(temp_list)
-    await message.answer(f"Все задачи сотрудников:\n{tasks_str}")
+            # Если исполнитель не назначен, значит задача для сектора
+            sector_name = sector_names.get(task.sector_task, "Неизвестный сектор")
+            executor_info = f"Весь сектор ({sector_name})"
+
+        # Определяем статус задачи
+        if task.status == TaskStatus.COMPLETED:
+            status_text = "✅ Выполнена"
+        elif task.status == TaskStatus.OVERDUE:
+            status_text = "❌ Просрочена"
+        else:
+            status_text = "⏳ В работе"
+
+        temp_list.append(f"{i}. {executor_info}:\n({status_text}) {task.title}\n{task.description}\n\n")
+
+    if temp_list:
+        tasks_str = "\n".join(temp_list)
+        await message.answer(f"Все задачи сотрудников:\n{tasks_str}")
+    else:
+        await message.answer("Нет задач для отображения")

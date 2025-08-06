@@ -1,7 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -131,10 +131,13 @@ class TaskRepository:
         if result.rowcount == 0:
             raise ValueError("Задача не найдена")
 
-    async  def get_staff_tasks(self):
-        stmt = (
-            select(Task, User)
-            .join(User, Task.executor_id == User.telegram_id)
+    async def get_staff_tasks(self):
+        # Получаем все задачи, которые либо назначены сотрудникам, либо секторам
+        stmt = select(Task).where(
+            or_(
+                Task.executor_id.isnot(None),  # Задачи с назначенным исполнителем
+                Task.sector_task.isnot(None)  # Задачи для секторов
+            )
         )
         result = await self.session.execute(stmt)
         return result.scalars().all()
