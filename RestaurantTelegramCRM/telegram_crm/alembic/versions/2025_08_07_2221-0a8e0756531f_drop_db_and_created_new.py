@@ -1,8 +1,8 @@
 """Drop db and created new
 
-Revision ID: 3add8166d3de
+Revision ID: 0a8e0756531f
 Revises: 
-Create Date: 2025-08-07 20:38:54.103548
+Create Date: 2025-08-07 22:21:17.881825
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '3add8166d3de'
+revision: str = '0a8e0756531f'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -38,9 +38,6 @@ def upgrade() -> None:
     sa.Column('deadline', sa.DateTime(), nullable=False),
     sa.Column('status', sa.Enum('ACTIVE', 'COMPLETED', 'OVERDUE', name='taskstatus'), nullable=False),
     sa.Column('sector_task', sa.Enum('BAR', 'HALL', 'KITCHEN', name='sectorstatus'), nullable=True),
-    sa.Column('notified_one_day', sa.Boolean(), nullable=False),
-    sa.Column('notified_today', sa.Boolean(), nullable=False),
-    sa.Column('notified_two_hours', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('completed_at', sa.DateTime(), nullable=True),
     sa.Column('comment', sa.Text(), nullable=True),
