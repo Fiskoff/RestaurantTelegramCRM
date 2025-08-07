@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.services.notification_service import notify_new_task, notify_updated_task, notify_deleted_task
 from core.db_helper import db_helper
 from core.models import Task, TaskStatus
 from app.repository.task_repository import TaskRepository
@@ -11,8 +12,19 @@ class TaskService:
     async def create_new_task(manager_id: int, executor_id: int, title: str, description: str, deadline: datetime,
                               sector_task: SectorStatus = None) -> dict:
         async with db_helper.session_factory() as session:
-            task_repository = TaskRepository(session)
-            await task_repository.create_task(manager_id, executor_id, title, description, deadline, sector_task)
+            new_task = Task(
+                manager_id=manager_id,
+                executor_id=executor_id,
+                title=title,
+                description=description,
+                deadline=deadline,
+                sector_task=sector_task
+            )
+            session.add(new_task)
+            await session.commit()
+            await session.refresh(new_task)
+
+            await notify_new_task(new_task)
             return {"success": True, "message": "Задача создана"}
 
     @staticmethod
@@ -68,7 +80,9 @@ class TaskService:
     async def delete_task_for_task_id(task_id: int):
         async with db_helper.session_factory() as session:
             task_repository = TaskRepository(session)
-            await task_repository.delete_task_for_task_id(task_id)
+            task = await task_repository.delete_task_for_task_id(task_id)
+            if task:
+                await notify_deleted_task(task)
 
     @staticmethod
     async def get_all_task() -> list[Task]:
@@ -80,6 +94,10 @@ class TaskService:
     async def update_task_field(task_id: int, field: str, new_value) -> dict:
         async with db_helper.session_factory() as session:
             task_repository = TaskRepository(session)
+            old_task = await task_repository.get_task_by_id(task_id)
+            if not old_task:
+                return {"success": False, "message": "Задача не найдена"}
+
             try:
                 if field == 'executor':
                     await task_repository.update_task_field(task_id, 'executor_id', new_value)
@@ -89,9 +107,12 @@ class TaskService:
                     await task_repository.update_task_field(task_id, 'executor_id', None)
                 else:
                     await task_repository.update_task_field(task_id, field, new_value)
-                return {"success": True, "message": "Задача успешно обновлена"}
+
+                new_task = await task_repository.get_task_by_id(task_id)
+                await notify_updated_task(old_task, new_task)
+                return {"success": True, "message": "Задача обновлена"}
             except Exception as e:
-                return {"success": False, "message": f"Ошибка при обновлении задачи: {str(e)}"}
+                return {"success": False, "message": f"Ошибка: {str(e)}"}
 
     @staticmethod
     async def get_staff_tasks():

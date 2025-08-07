@@ -1,8 +1,8 @@
 """Drop db and created new
 
-Revision ID: 9fb94fb97e26
+Revision ID: 3add8166d3de
 Revises: 
-Create Date: 2025-08-06 20:14:05.053327
+Create Date: 2025-08-07 20:38:54.103548
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '9fb94fb97e26'
+revision: str = '3add8166d3de'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -37,11 +37,14 @@ def upgrade() -> None:
     sa.Column('description', sa.Text(), nullable=False),
     sa.Column('deadline', sa.DateTime(), nullable=False),
     sa.Column('status', sa.Enum('ACTIVE', 'COMPLETED', 'OVERDUE', name='taskstatus'), nullable=False),
+    sa.Column('sector_task', sa.Enum('BAR', 'HALL', 'KITCHEN', name='sectorstatus'), nullable=True),
+    sa.Column('notified_one_day', sa.Boolean(), nullable=False),
+    sa.Column('notified_today', sa.Boolean(), nullable=False),
+    sa.Column('notified_two_hours', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('completed_at', sa.DateTime(), nullable=True),
     sa.Column('comment', sa.Text(), nullable=True),
     sa.Column('photo_url', sa.Text(), nullable=True),
-    sa.Column('sector_task', sa.Enum('BAR', 'HALL', 'KITCHEN', name='sectorstatus'), nullable=True),
     sa.Column('executor_id', sa.BigInteger(), nullable=True),
     sa.Column('manager_id', sa.BigInteger(), nullable=False),
     sa.ForeignKeyConstraint(['executor_id'], ['users.telegram_id'], ),

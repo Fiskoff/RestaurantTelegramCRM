@@ -32,3 +32,7 @@ class UserRepository:
         result = await self.session.execute(delete(User).where(User.telegram_id == telegram_id))
         await self.session.commit()
         return result.rowcount
+
+    async def get_users_by_sector(self, sector: SectorStatus):
+        result = await self.session.execute(select(User).where(User.sector == sector))
+        return result.scalars().all()

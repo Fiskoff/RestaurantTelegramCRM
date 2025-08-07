@@ -98,13 +98,17 @@ class TaskRepository:
 
 
     async def delete_task_for_task_id(self, task_id):
-        await self.session.execute(delete(Task).where(Task.task_id == task_id))
-        await self.session.commit()
+        task = await self.get_task_by_id(task_id)
+        if task:
+            await self.session.delete(task)
+            await self.session.commit()
+        return task
 
 
     async  def get_activ_and_overdue_tasks(self):
         result = await self.session.execute(select(Task).where(Task.status != TaskStatus.COMPLETED))
         return result.scalars().all()
+
 
     async def update_task_field(self, task_id: int, field: str, new_value):
         field_mapping = {
@@ -130,6 +134,7 @@ class TaskRepository:
         if result.rowcount == 0:
             raise ValueError("Задача не найдена")
 
+
     async def get_staff_tasks(self):
         stmt = select(Task).where(
             or_(
@@ -140,6 +145,7 @@ class TaskRepository:
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
+
     async def get_sector_tasks(self, sector: SectorStatus):
         result = await self.session.execute(
             select(Task).where(
@@ -147,4 +153,13 @@ class TaskRepository:
                 Task.status != TaskStatus.COMPLETED
             )
         )
+        return result.scalars().all()
+
+
+    async def get_tasks_for_notification(self, current_time: datetime) -> list[Task]:
+        stmt = select(Task).where(
+            Task.status == TaskStatus.ACTIVE,
+            Task.deadline > current_time
+        )
+        result = await self.session.execute(stmt)
         return result.scalars().all()

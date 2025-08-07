@@ -40,3 +40,9 @@ class UserService:
             except Exception as e:
                 print(e)
                 return {"success": False, "message": f"Ошибка при удалении: {str(e)}"}
+
+    @staticmethod
+    async def get_users_by_sector(sector: SectorStatus):
+        async with db_helper.session_factory() as session:
+            user_repository = UserRepository(session)
+            return await user_repository.get_users_by_sector(sector)
