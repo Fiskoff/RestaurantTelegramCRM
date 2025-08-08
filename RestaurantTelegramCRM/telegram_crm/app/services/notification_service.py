@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from core.models import Task, SectorStatus
 from app.services.user_service import UserService
 
+
 if TYPE_CHECKING:
     from aiogram import Bot
 
@@ -171,3 +172,40 @@ async def notify_deleted_task(task: Task):
 
     except Exception as e:
         logger.error(f"Error in notify_deleted_task for task {task.task_id}: {e}")
+
+
+async def notify_manager_task_completed(task: Task, employee_full_name: str):
+    if not _bot_instance:
+        logger.warning("Bot instance not initialized, skipping manager task completion notification.")
+        return
+
+    if not task.manager_id:
+        logger.info(f"Task {task.task_id} has no manager assigned. No manager notification sent.")
+        return
+
+    try:
+        message_text = (
+            f"✅ <b>Отчёт по задаче</b>\n\n"
+            f"<b>Задача:</b> {task.title}\n"
+            f"<b>Выполнил(а):</b> {employee_full_name}\n"
+        )
+
+        if task.comment:
+            escaped_comment = task.comment.replace("&", "&amp;").replace("<", "<").replace(">", ">")
+            message_text += f"<b>Комментарий:</b> {escaped_comment}\n"
+        else:
+            message_text += f"<b>Комментарий:</b> Нет комментария\n"
+
+        photo_count = 0
+        if task.photo_url:
+            photo_urls = [url.strip() for url in task.photo_url.split(',') if url.strip()]
+            photo_count = len(photo_urls)
+
+        if photo_count > 0:
+            message_text += f"\n📸 <b>Прикреплено {photo_count} фото.</b>"
+
+        logger.info(f"Sending task completion notification to manager {task.manager_id}.")
+        await _send_message(task.manager_id, message_text)
+
+    except Exception as e:
+        logger.error(f"Error in notify_manager_task_completed for task {task.task_id}: {e}")

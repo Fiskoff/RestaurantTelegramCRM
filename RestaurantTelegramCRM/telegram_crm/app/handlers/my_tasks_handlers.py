@@ -11,6 +11,7 @@ from app.keyboards.select_all_task_keyboard import format_tasks_list, build_task
 from app.keyboards.task_reply_keyboard import get_task_action_keyboard, get_report_action_keyboard, get_remove_keyboard
 from app.services.task_service import TaskService
 from app.services.user_service import UserService
+from app.services.notification_service import notify_manager_task_completed
 
 
 my_task_router = Router()
@@ -131,14 +132,18 @@ async def send_report(message: Message, state: FSMContext):
     result = await TaskService.complete_task(task_id, comment, photo_url, executor_id)
 
     if result["success"]:
+        try:
+            updated_task = await TaskService.get_task_by_id(task_id)
+            employee_user = await UserService.get_user_by_telegram_id(message.from_user.id)
+            employee_name = f"{employee_user.full_name} - {employee_user.position}" if employee_user else "Неизвестный сотрудник"
+
+            await notify_manager_task_completed(updated_task, employee_name)
+        except Exception as notify_error:
+            print(f"Ошибка при отправке уведомления менеджеру о выполнении задачи {task_id}: {notify_error}")
+
         await message.answer(
             "✅ Отчёт успешно отправлен!\n"
             "Задача отмечена как выполненная!",
-            reply_markup=get_remove_keyboard()
-        )
-    else:
-        await message.answer(
-            f"❌ Ошибка при отправке отчёта: {result['message']}",
             reply_markup=get_remove_keyboard()
         )
 
