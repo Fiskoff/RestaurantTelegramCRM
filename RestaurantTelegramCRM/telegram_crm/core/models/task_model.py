@@ -1,7 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Integer, Text, DateTime, ForeignKey, BigInteger, String, Enum
+from sqlalchemy import Integer, Text, DateTime, ForeignKey, BigInteger, String, Enum, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.models.base_model import BaseModel, TaskStatus, SectorStatus
@@ -21,6 +21,9 @@ class Task(BaseModel):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notified_one_day: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notified_today: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notified_two_hours: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     executor_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.telegram_id"), nullable=True)
     manager_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id"), nullable=False)

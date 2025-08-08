@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, update, delete, or_
@@ -147,4 +147,20 @@ class TaskRepository:
                 Task.status != TaskStatus.COMPLETED
             )
         )
+        return result.scalars().all()
+
+
+    async def get_active_tasks_for_notification(self) -> list[Task]:
+        kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
+        current_time = datetime.now(kemerovo_tz)
+        future_time = current_time + timedelta(hours=48)
+        stmt = (
+            select(Task)
+            .where(
+                Task.status == TaskStatus.ACTIVE,
+                Task.deadline >= current_time.replace(tzinfo=None),  # Сравниваем naive datetime
+                Task.deadline <= future_time.replace(tzinfo=None)
+            )
+        )
+        result = await self.session.execute(stmt)
         return result.scalars().all()

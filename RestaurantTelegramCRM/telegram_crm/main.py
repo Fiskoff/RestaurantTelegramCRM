@@ -30,7 +30,7 @@ async def main():
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
-    overdue_middleware = OverdueCheckerMiddleware(check_interval=60)
+    overdue_middleware = OverdueCheckerMiddleware(bot, check_interval=60)
     dp.message.middleware(overdue_middleware)
     dp.callback_query.middleware(overdue_middleware)
 
