@@ -24,6 +24,7 @@ class Task(BaseModel):
     notified_one_day: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     notified_today: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     notified_two_hours: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notified_overdue: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     executor_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.telegram_id"), nullable=True)
     manager_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id"), nullable=False)

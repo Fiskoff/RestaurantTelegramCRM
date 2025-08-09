@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -7,6 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.models import Task, TaskStatus, User
 from core.models.base_model import SectorStatus
+
+
+logger = logging.getLogger(__name__)
 
 
 class TaskRepository:
@@ -47,13 +51,15 @@ class TaskRepository:
         await self.session.commit()
         return result.rowcount
 
+
     async def get_all_overdue_tasks(self):
         stmt_with_executor = (
             select(Task, User)
             .join(User, Task.executor_id == User.telegram_id)
             .where(
                 Task.status == TaskStatus.OVERDUE,
-                Task.executor_id.isnot(None)
+                Task.executor_id.isnot(None),
+                Task.notified_overdue == False
             )
         )
         result_with_executor = await self.session.execute(stmt_with_executor)
@@ -64,13 +70,27 @@ class TaskRepository:
             .where(
                 Task.status == TaskStatus.OVERDUE,
                 Task.executor_id.is_(None),
-                Task.sector_task.isnot(None)
+                Task.sector_task.isnot(None),
+                Task.notified_overdue == False
             )
         )
         result_for_sector = await self.session.execute(stmt_for_sector)
         overdue_tasks_for_sector = result_for_sector.scalars().all()
 
         return overdue_tasks_with_users, overdue_tasks_for_sector
+
+
+    async def mark_tasks_as_notified_overdue(self, task_ids: list[int]):
+        if not task_ids:
+            return
+        stmt = (
+            update(Task)
+            .where(Task.task_id.in_(task_ids))
+            .values(notified_overdue=True)
+        )
+        await self.session.execute(stmt)
+        await self.session.commit()
+        logger.info(f"Marked {len(task_ids)} tasks as notified overdue.")
 
 
     async def complete_task(self, task_id: int, comment: str = None, photo_url: str = None, executor_id: int = None):
