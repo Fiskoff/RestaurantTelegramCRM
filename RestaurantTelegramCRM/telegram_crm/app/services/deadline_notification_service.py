@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from core.db_helper import db_helper
 from core.models import Task
-from core.models.base_model import SectorStatus
+from core.models.base_model import SectorStatus, TaskStatus
 from app.repository.task_repository import TaskRepository
 from app.services.user_service import UserService
 
@@ -50,6 +50,10 @@ class DeadlineNotificationService:
             logger.error(f"Критическая ошибка в check_and_notify: {e}")
 
     async def _process_task_notification(self, task: Task, current_time: datetime) -> bool:
+        if task.status != TaskStatus.ACTIVE:
+            logger.debug(f"Пропущена задача {task.task_id} со статусом {task.status} для уведомления о дедлайне.")
+            return False
+
         if task.deadline.tzinfo is None:
             deadline_aware = task.deadline.replace(tzinfo=self.kemerovo_tz)
         else:
@@ -60,21 +64,21 @@ class DeadlineNotificationService:
 
         notification_sent = False
 
-        if 23.5 <= hours_left <= 24.5 and not getattr(task, 'notified_one_day', False):
+        if 23.5 <= hours_left <= 48.5 and not getattr(task, 'notified_one_day', False) and task.status == TaskStatus.ACTIVE:
             await self._send_notification(task, "завтра")
             if hasattr(task, 'notified_one_day'):
                 task.notified_one_day = True
             notification_sent = True
             logger.info(f"Отправлено уведомление 'за 1 день' по задаче {task.task_id}")
 
-        elif 2.0 < hours_left <= 24.0 and not getattr(task, 'notified_today', False):
+        elif 2.0 < hours_left <= 24.0 and not getattr(task, 'notified_today', False) and task.status == TaskStatus.ACTIVE:
             await self._send_notification(task, "сегодня")
             if hasattr(task, 'notified_today'):
                 task.notified_today = True
             notification_sent = True
             logger.info(f"Отправлено уведомление 'сегодня' по задаче {task.task_id}")
 
-        elif 0 <= hours_left <= 2.0 and not getattr(task, 'notified_two_hours', False):
+        elif 0 <= hours_left <= 2.0 and not getattr(task, 'notified_two_hours', False) and task.status == TaskStatus.ACTIVE:
             await self._send_notification(task, "через 2 часа")
             if hasattr(task, 'notified_two_hours'):
                 task.notified_two_hours = True
@@ -82,6 +86,7 @@ class DeadlineNotificationService:
             logger.info(f"Отправлено уведомление 'за 2 часа' по задаче {task.task_id}")
 
         return notification_sent
+
 
     async def _send_notification(self, task: Task, timeframe: str):
         if task.deadline.tzinfo is None:

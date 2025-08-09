@@ -82,6 +82,20 @@ class TaskRepository:
 
     async def mark_tasks_as_notified_overdue(self, task_ids: list[int]):
         if not task_ids:
+            logger.debug("No task IDs provided to mark as notified overdue.")
+            return
+        stmt = (
+            update(Task)
+            .where(Task.task_id.in_(task_ids))
+            .values(notified_overdue=True)
+        )
+        result = await self.session.execute(stmt)
+        await self.session.commit()
+        logger.info(f"Marked {len(task_ids)} tasks as notified overdue (DB rows affected: {result.rowcount}).")
+
+
+    async def mark_tasks_as_notified_overdue(self, task_ids: list[int]):
+        if not task_ids:
             return
         stmt = (
             update(Task)
@@ -141,6 +155,7 @@ class TaskRepository:
         result = await self.session.execute(select(Task).where(Task.status != TaskStatus.COMPLETED))
         return result.scalars().all()
 
+
     async def update_task_field(self, task_id: int, field: str, new_value):
         field_mapping = {
             'title': Task.title,
@@ -165,6 +180,7 @@ class TaskRepository:
         if result.rowcount == 0:
             raise ValueError("Задача не найдена")
 
+
     async def get_staff_tasks(self):
         stmt = select(Task).where(
             or_(
@@ -174,6 +190,7 @@ class TaskRepository:
         )
         result = await self.session.execute(stmt)
         return result.scalars().all()
+
 
     async def get_sector_tasks(self, sector: SectorStatus):
         result = await self.session.execute(
