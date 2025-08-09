@@ -16,7 +16,7 @@ class DatabaseENV(EnvLoader):
 
 class DataBaseConfig(BaseModel):
     url: str = DatabaseENV.DATABASE_URL
-    echo: bool = True
+    echo: bool = False
     pool_size: int = 10
     max_overflow: int = 15
 

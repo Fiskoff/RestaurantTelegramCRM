@@ -47,16 +47,31 @@ class TaskRepository:
         await self.session.commit()
         return result.rowcount
 
-
     async def get_all_overdue_tasks(self):
-        stmt = (
+        stmt_with_executor = (
             select(Task, User)
             .join(User, Task.executor_id == User.telegram_id)
-            .where(Task.status == TaskStatus.OVERDUE, Task.executor_id.isnot(None))
+            .where(
+                Task.status == TaskStatus.OVERDUE,
+                Task.executor_id.isnot(None)
+            )
         )
-        result = await self.session.execute(stmt)
-        overdue_tasks_with_users = result.all()
-        return overdue_tasks_with_users
+        result_with_executor = await self.session.execute(stmt_with_executor)
+        overdue_tasks_with_users = result_with_executor.all()
+
+        stmt_for_sector = (
+            select(Task)
+            .where(
+                Task.status == TaskStatus.OVERDUE,
+                Task.executor_id.is_(None),
+                Task.sector_task.isnot(None)
+            )
+        )
+        result_for_sector = await self.session.execute(stmt_for_sector)
+        overdue_tasks_for_sector = result_for_sector.scalars().all()
+
+        return overdue_tasks_with_users, overdue_tasks_for_sector
+
 
     async def complete_task(self, task_id: int, comment: str = None, photo_url: str = None, executor_id: int = None):
         kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
