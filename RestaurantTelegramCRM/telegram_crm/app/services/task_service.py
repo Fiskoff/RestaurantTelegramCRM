@@ -64,7 +64,7 @@ class TaskService:
     async def get_all_overdue_tasks():
         async with db_helper.session_factory() as session:
             task_repository = TaskRepository(session)
-            return await task_repository.get_all_overdue_tasks()
+            return await task_repository.get_all_overdue_tasks_command()
 
     @staticmethod
     async def complete_task(task_id: int, comment: str = None, photo_url: str = None, executor_id: int = None) -> dict:

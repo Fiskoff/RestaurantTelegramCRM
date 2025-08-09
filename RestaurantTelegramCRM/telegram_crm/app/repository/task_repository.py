@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, update, delete, or_
+from sqlalchemy import select, update, delete, or_, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -50,6 +50,34 @@ class TaskRepository:
         result = await self.session.execute(stmt)
         await self.session.commit()
         return result.rowcount
+
+
+    async def get_all_overdue_tasks_command(self):
+        stmt_with_executor = (
+            select(Task, User)
+            .join(User, Task.executor_id == User.telegram_id)
+            .where(
+                Task.status == TaskStatus.OVERDUE,
+                Task.executor_id.isnot(None),
+            )
+        )
+        result_with_executor = await self.session.execute(stmt_with_executor)
+        overdue_tasks_with_users = result_with_executor.all()
+
+        stmt_for_sector = (
+            select(Task, literal(None).label('user'))
+            .where(
+                Task.status == TaskStatus.OVERDUE,
+                Task.executor_id.is_(None),
+                Task.sector_task.isnot(None),
+            )
+        )
+        result_for_sector = await self.session.execute(stmt_for_sector)
+        overdue_tasks_for_sector = result_for_sector.all()
+
+        all_overdue_tasks = overdue_tasks_with_users + overdue_tasks_for_sector
+
+        return all_overdue_tasks
 
 
     async def get_all_overdue_tasks(self):
