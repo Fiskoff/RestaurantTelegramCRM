@@ -2,17 +2,18 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from aiogram import Router, F
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
+
+from app.keyboards.deadline_keyboars import create_deadline_keyboard, calculate_deadline_from_callback
 
 from app.keyboards.change_task_keyboars import build_delete_tasks_keyboard, build_update_tasks_keyboard
 from app.keyboards.task_reply_keyboard import get_update_task_action_keyboard
 from app.services.task_service import TaskService
 from app.services.user_service import UserService
 from core.models import SectorStatus
-
 
 change_task_router = Router()
 
@@ -27,6 +28,19 @@ class UpdateTaskStates(StatesGroup):
     waiting_for_new_value = State()
     waiting_for_continue = State()
     waiting_for_sector_choice = State()
+
+
+def format_deadline(deadline: datetime | None) -> str:
+    if deadline is None:
+        return "Бессрочно"
+
+    kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
+    if deadline.tzinfo is None:
+        deadline_with_tz = deadline.replace(tzinfo=kemerovo_tz)
+    else:
+        deadline_with_tz = deadline.astimezone(kemerovo_tz)
+
+    return deadline_with_tz.strftime('%d.%m.%Y - %H:%M')
 
 
 @change_task_router.message(F.text == "❌ Удалить задачу")
@@ -52,8 +66,7 @@ async def start_change_task(callback_query: CallbackQuery, state: FSMContext):
     task_id_str = callback_query.data.split(':')[1]
     task_id = int(task_id_str)
     selected_task = await TaskService.get_task_by_id(task_id)
-    kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
-    deadline_with_tz = selected_task.deadline.replace(tzinfo=kemerovo_tz)
+
     await state.update_data(task_id=task_id)
 
     if selected_task.executor:
@@ -70,12 +83,14 @@ async def start_change_task(callback_query: CallbackQuery, state: FSMContext):
         else:
             executor_info = "Исполнитель не назначен"
 
+    deadline_str = format_deadline(selected_task.deadline)
+
     task_info = (
         f"Задача для изменения:\n"
         f"Название: {selected_task.title}\n"
         f"Описание: {selected_task.description}\n"
         f"Исполнитель: {executor_info}\n"
-        f"Дедлайн: {deadline_with_tz.strftime('%d.%m.%Y - %H:%M')}\n"
+        f"Дедлайн: {deadline_str}\n"
     )
 
     await callback_query.message.answer(task_info)
@@ -100,8 +115,8 @@ async def process_field_choice(message: Message, state: FSMContext):
         '2': 'description',
         '3': 'executor',
         '4': 'deadline',
-        '5': 'sector_assignment',  # Новая опция
-        '6': 'cancel'  # Опция отмены
+        '5': 'sector_assignment',
+        '6': 'cancel'
     }
 
     if message.text not in field_map:
@@ -120,12 +135,15 @@ async def process_field_choice(message: Message, state: FSMContext):
         sector_keyboard = create_sector_selection_keyboard()
         await message.answer("Выберите сектор, которому хотите назначить задачу:", reply_markup=sector_keyboard)
         await state.set_state(UpdateTaskStates.waiting_for_sector_choice)
+    elif field == 'deadline':
+        deadline_kb = create_deadline_keyboard()
+        await message.answer("Выберите новый срок выполнения задачи:", reply_markup=deadline_kb)
+        await state.set_state(UpdateTaskStates.waiting_for_new_value)
     else:
         field_names = {
             'title': 'название задачи',
             'description': 'описание задачи',
             'executor': 'сотрудника (введите Telegram ID)',
-            'deadline': 'дедлайн (в формате 01.01.2025 - 22:30)'
         }
 
         if field == 'executor':
@@ -141,12 +159,73 @@ async def process_field_choice(message: Message, state: FSMContext):
                 )
             else:
                 await message.answer("Введите Telegram ID нового сотрудника:")
-        elif field == 'deadline':
-            await message.answer("Введите новую дату дедлайна в формате 01.01.2025 - 22:30")
         else:
             field_name = field_names[field]
             await message.answer(f"Введите новое {field_name}:")
         await state.set_state(UpdateTaskStates.waiting_for_new_value)
+
+
+@change_task_router.callback_query(StateFilter(UpdateTaskStates.waiting_for_new_value),
+                                   lambda c: c.data and c.data.startswith('deadline:'))
+async def process_deadline_callback(callback_query: CallbackQuery, state: FSMContext):
+    await callback_query.answer()
+
+    user_data = await state.get_data()
+    task_id = user_data.get('task_id')
+    field_to_update = user_data.get('field_to_update')
+
+    if not task_id or field_to_update != 'deadline':
+        await callback_query.message.answer("Произошла ошибка. Попробуйте начать сначала.")
+        await state.clear()
+        return
+
+    data = callback_query.data
+
+    if data == "deadline:manual":
+        await callback_query.message.edit_text(
+            "Укажите новую дату и время окончания задачи в формате: 01.01.2025 - 22:30"
+        )
+        return
+
+    new_deadline = calculate_deadline_from_callback(data)
+
+    result = await TaskService.update_task_field(task_id, 'deadline', new_deadline)
+
+    if result["success"]:
+        updated_task = await TaskService.get_task_by_id(task_id)
+
+        if updated_task.executor:
+            executor_info = f"{updated_task.executor.full_name} - {updated_task.executor.position}"
+        else:
+            if updated_task.sector_task:
+                sector_names = {
+                    SectorStatus.BAR: "Бар",
+                    SectorStatus.HALL: "Зал",
+                    SectorStatus.KITCHEN: "Кухня"
+                }
+                sector_name = sector_names.get(updated_task.sector_task, str(updated_task.sector_task))
+                executor_info = f"Весь сектор ({sector_name})"
+            else:
+                executor_info = "Исполнитель не назначен"
+
+        deadline_str = format_deadline(updated_task.deadline)
+
+        await callback_query.message.edit_text(
+            f"Задача успешно обновлена!\n"
+            f"Название: {updated_task.title}\n"
+            f"Описание: {updated_task.description}\n"
+            f"Исполнитель: {executor_info}\n"
+            f"Дедлайн: {deadline_str}\n"
+        )
+
+        await callback_query.message.answer(
+            "Хотите изменить что-то еще в этой задаче?\n"
+            "Введите 'да' для продолжения или 'нет' для завершения"
+        )
+        await state.set_state(UpdateTaskStates.waiting_for_continue)
+    else:
+        await callback_query.message.edit_text(f"Ошибка при обновлении задачи: {result['message']}")
+        await state.clear()
 
 
 async def show_all_tasks(message: Message):
@@ -179,8 +258,6 @@ async def process_sector_choice(callback_query: CallbackQuery, state: FSMContext
         await callback_query.message.answer("Назначение сектору отменено.")
         await state.set_state(UpdateTaskStates.waiting_for_field_choice)
         selected_task = await TaskService.get_task_by_id(task_id)
-        kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
-        deadline_with_tz = selected_task.deadline.replace(tzinfo=kemerovo_tz)
 
         if selected_task.executor:
             executor_info = f"{selected_task.executor.full_name} - {selected_task.executor.position}"
@@ -196,12 +273,14 @@ async def process_sector_choice(callback_query: CallbackQuery, state: FSMContext
             else:
                 executor_info = "Исполнитель не назначен"
 
+        deadline_str = format_deadline(selected_task.deadline)
+
         task_info = (
             f"Задача для изменения:\n"
             f"Название: {selected_task.title}\n"
             f"Описание: {selected_task.description}\n"
             f"Исполнитель: {executor_info}\n"
-            f"Дедлайн: {deadline_with_tz.strftime('%d.%m.%Y - %H:%M')}\n"
+            f"Дедлайн: {deadline_str}\n"
         )
 
         await callback_query.message.answer(task_info)
@@ -234,8 +313,6 @@ async def process_sector_choice(callback_query: CallbackQuery, state: FSMContext
 
     if result["success"]:
         updated_task = await TaskService.get_task_by_id(task_id)
-        kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
-        deadline_with_tz = updated_task.deadline.replace(tzinfo=kemerovo_tz)
 
         sector_names = {
             SectorStatus.BAR: "Бар",
@@ -244,12 +321,14 @@ async def process_sector_choice(callback_query: CallbackQuery, state: FSMContext
         }
         sector_name = sector_names.get(sector, str(sector))
 
+        deadline_str = format_deadline(updated_task.deadline)
+
         await callback_query.message.answer(
             f"Задача успешно переназначена!\n"
             f"Название: {updated_task.title}\n"
             f"Описание: {updated_task.description}\n"
             f"Исполнитель: Весь сектор ({sector_name})\n"
-            f"Дедлайн: {deadline_with_tz}\n"
+            f"Дедлайн: {deadline_str}\n"
         )
 
         await callback_query.message.answer(
@@ -301,15 +380,13 @@ async def process_new_value(message: Message, state: FSMContext):
             except ValueError:
                 await message.answer("Введите дату в формате 01.01.2025 - 22:30")
                 return
+        else:
+            pass
 
         result = await TaskService.update_task_field(task_id, field_to_update, new_value)
 
         if result["success"]:
             updated_task = await TaskService.get_task_by_id(task_id)
-            kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
-            deadline_with_tz = updated_task.deadline.replace(tzinfo=kemerovo_tz)
-
-            formatted_deadline = deadline_with_tz.strftime("%d.%m.%Y - %H:%M")
 
             if updated_task.executor:
                 executor_info = f"{updated_task.executor.full_name} - {updated_task.executor.position}"
@@ -325,12 +402,14 @@ async def process_new_value(message: Message, state: FSMContext):
                 else:
                     executor_info = "Исполнитель не назначен"
 
+            deadline_str = format_deadline(updated_task.deadline)
+
             await message.answer(
                 f"Задача успешно обновлена!\n"
                 f"Название: {updated_task.title}\n"
                 f"Описание: {updated_task.description}\n"
                 f"Исполнитель: {executor_info}\n"
-                f"Дедлайн: {formatted_deadline}\n"
+                f"Дедлайн: {deadline_str}\n"
             )
 
             await message.answer(
@@ -354,8 +433,6 @@ async def process_continue_editing(message: Message, state: FSMContext):
 
     if message.text.lower() in ['да', 'yes', 'y']:
         selected_task = await TaskService.get_task_by_id(task_id)
-        kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
-        deadline_with_tz = selected_task.deadline.replace(tzinfo=kemerovo_tz)
 
         if selected_task.executor:
             executor_info = f"{selected_task.executor.full_name} - {selected_task.executor.position}"
@@ -371,12 +448,14 @@ async def process_continue_editing(message: Message, state: FSMContext):
             else:
                 executor_info = "Исполнитель не назначен"
 
+        deadline_str = format_deadline(selected_task.deadline)
+
         task_info = (
             f"Задача для изменения:\n"
             f"Название: {selected_task.title}\n"
             f"Описание: {selected_task.description}\n"
             f"Исполнитель: {executor_info}\n"
-            f"Дедлайн: {deadline_with_tz.strftime('%d.%m.%Y - %H:%M')}\n"
+            f"Дедлайн: {deadline_str}\n"
         )
 
         await message.answer(task_info)
@@ -387,6 +466,7 @@ async def process_continue_editing(message: Message, state: FSMContext):
             "3 - Сотрудник\n"
             "4 - Дедлайн\n"
             "5 - Назначить сектору (снять с сотрудника)\n"
+            "6 - Отмена\n"
             "Отправьте подходящее число"
         )
         await state.set_state(UpdateTaskStates.waiting_for_field_choice)
@@ -405,8 +485,6 @@ async def start_delete_task(callback_query: CallbackQuery, state: FSMContext):
     task_id_str = callback_query.data.split(':')[1]
     task_id = int(task_id_str)
     selected_task = await TaskService.get_task_by_id(task_id)
-    kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
-    deadline_with_tz = selected_task.deadline.replace(tzinfo=kemerovo_tz)
 
     if selected_task.executor:
         executor_info = f"{selected_task.executor.full_name} - {selected_task.executor.position}"
@@ -422,11 +500,13 @@ async def start_delete_task(callback_query: CallbackQuery, state: FSMContext):
         else:
             executor_info = "Исполнитель не назначен"
 
+    deadline_str = format_deadline(selected_task.deadline)
+
     await callback_query.message.answer(
         f"Название: {selected_task.title}\n"
         f"Описание: {selected_task.description}\n"
         f"Исполнитель: {executor_info}\n"
-        f"Дедлайн: {deadline_with_tz}\n"
+        f"Дедлайн: {deadline_str}\n"
     )
     await callback_query.message.answer(
         "Подтвердите удаление задачи\n"

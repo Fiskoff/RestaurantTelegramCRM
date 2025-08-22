@@ -14,7 +14,7 @@ class Task(BaseModel):
     task_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    deadline: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus), default=TaskStatus.ACTIVE, nullable=False, index=True)
     sector_task: Mapped[SectorStatus | None] = mapped_column(Enum(SectorStatus), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(ZoneInfo("Asia/Krasnoyarsk")), nullable=False)

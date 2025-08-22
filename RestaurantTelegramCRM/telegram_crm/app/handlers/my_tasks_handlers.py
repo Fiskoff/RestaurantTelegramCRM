@@ -13,13 +13,30 @@ from app.services.task_service import TaskService
 from app.services.user_service import UserService
 from app.services.notification_service import notify_manager_task_completed
 
-
 my_task_router = Router()
 
 
 class TaskCompletionStates(StatesGroup):
     waiting_for_report = State()
     task_id = State()
+
+
+def is_task_active(task_deadline: datetime | None, current_time: datetime) -> bool:
+    """
+    Проверяет, является ли задача активной.
+    Задача без дедлайна считается всегда активной.
+    """
+    if task_deadline is None:
+        return True  # Задачи без дедлайна всегда активны
+    # Для задач с дедлайном проверяем дату
+    kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
+    # Убедимся, что у дедлайна есть таймзона
+    if task_deadline.tzinfo is None:
+        deadline_with_tz = task_deadline.replace(tzinfo=kemerovo_tz)
+    else:
+        deadline_with_tz = task_deadline.astimezone(kemerovo_tz)
+
+    return deadline_with_tz > current_time
 
 
 @my_task_router.message(Command("my_tasks"))
@@ -53,8 +70,10 @@ async def get_my_tasks(message: Message, state: FSMContext):
 
     kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
     current_time = datetime.now(kemerovo_tz)
-    active_tasks = [t for t in all_tasks if t.deadline.replace(tzinfo=kemerovo_tz) > current_time]
-    overdue_tasks = [t for t in all_tasks if t.deadline.replace(tzinfo=kemerovo_tz) <= current_time]
+
+    active_tasks = [t for t in all_tasks if is_task_active(t.deadline, current_time)]
+    overdue_tasks = [t for t in all_tasks if not is_task_active(t.deadline, current_time) and t.deadline is not None]
+
     active_text = format_tasks_list(active_tasks, "🟢 Активные задачи:")
     overdue_text = format_tasks_list(overdue_tasks, "🔴 Просроченные задачи:")
 
@@ -78,13 +97,16 @@ async def get_task_by_id(callback_query: CallbackQuery, state: FSMContext):
 
     await state.update_data(task_id=task_id)
 
-    kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
-    if task.deadline.tzinfo is None:
-        deadline_with_tz = task.deadline.replace(tzinfo=kemerovo_tz)
+    if task.deadline is None:
+        deadline_str = "Бессрочно"
     else:
-        deadline_with_tz = task.deadline
+        kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
+        if task.deadline.tzinfo is None:
+            deadline_with_tz = task.deadline.replace(tzinfo=kemerovo_tz)
+        else:
+            deadline_with_tz = task.deadline.astimezone(kemerovo_tz)
+        deadline_str = deadline_with_tz.strftime("%d.%m.%Y %H:%M")
 
-    deadline_str = deadline_with_tz.strftime("%d.%m.%Y %H:%M")
     response_text = (
         f"«{task.title}»\n"
         f"📄 Описание задачи: {task.description}\n"
@@ -199,8 +221,9 @@ async def show_tasks_list(message: Message):
 
     kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
     current_time = datetime.now(kemerovo_tz)
-    active_tasks = [t for t in tasks if t.deadline.replace(tzinfo=kemerovo_tz) > current_time]
-    overdue_tasks = [t for t in tasks if t.deadline.replace(tzinfo=kemerovo_tz) <= current_time]
+
+    active_tasks = [t for t in tasks if is_task_active(t.deadline, current_time)]
+    overdue_tasks = [t for t in tasks if not is_task_active(t.deadline, current_time) and t.deadline is not None]
 
     active_text = format_tasks_list(active_tasks, "🟢 Активные задачи:")
     overdue_text = format_tasks_list(overdue_tasks, "🔴 Просроченные задачи:")

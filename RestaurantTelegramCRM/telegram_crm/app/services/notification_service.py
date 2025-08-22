@@ -38,7 +38,10 @@ async def notify_new_task(task: Task):
         return
 
     try:
-        deadline_str = task.deadline.strftime('%d.%m.%Y - %H:%M')
+        if task.deadline is not None:
+            deadline_str = task.deadline.strftime('%d.%m.%Y - %H:%M')
+        else:
+            deadline_str = "Бессрочно"
 
         if task.executor_id:
             logger.info(f"Sending new task notification to executor {task.executor_id}.")
@@ -109,7 +112,10 @@ async def notify_updated_task(old_task: Task, new_task: Task):
 
         if new_task.executor_id:
             logger.info(f"Sending updated task notification to new executor {new_task.executor_id}.")
-            deadline_str = new_task.deadline.strftime('%d.%m.%Y - %H:%M')
+            if new_task.deadline is not None:
+                deadline_str = new_task.deadline.strftime('%d.%m.%Y - %H:%M')
+            else:
+                deadline_str = "Бессрочно"
             message_text = (
                 f"✏️ <b>Вам назначена задача (изменена)!</b>\n\n"
                 f"<b>Задача:</b> {new_task.title}\n"
@@ -127,7 +133,10 @@ async def notify_updated_task(old_task: Task, new_task: Task):
                 SectorStatus.KITCHEN: "Кухня"
             }
             new_sector_name = sector_display_names.get(new_task.sector_task, str(new_task.sector_task))
-            deadline_str = new_task.deadline.strftime('%d.%m.%Y - %H:%M')
+            if new_task.deadline is not None:
+                deadline_str = new_task.deadline.strftime('%d.%m.%Y - %H:%M')
+            else:
+                deadline_str = "Бессрочно"
             message_text = (
                 f"✏️ <b>Изменена задача для всего сектора ({new_sector_name})!</b>\n\n"
                 f"<b>Задача:</b> {new_task.title}\n"

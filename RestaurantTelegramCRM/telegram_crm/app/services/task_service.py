@@ -10,12 +10,16 @@ from app.repository.task_repository import TaskRepository
 class TaskService:
     @staticmethod
     async def create_new_task(manager_id: int, executor_id: int | None, title: str, description: str,
-                              deadline: datetime, sector_task: SectorStatus | None = None) -> dict:
+                              deadline: datetime | None,
+                              sector_task: SectorStatus | None = None) -> dict:
         kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
-        if deadline.tzinfo is None:
-            aware_deadline = deadline.replace(tzinfo=kemerovo_tz)
-        else:
-            aware_deadline = deadline.astimezone(kemerovo_tz)
+
+        aware_deadline = None
+        if deadline is not None:
+            if deadline.tzinfo is None:
+                aware_deadline = deadline.replace(tzinfo=kemerovo_tz)
+            else:
+                aware_deadline = deadline.astimezone(kemerovo_tz)
 
         async with db_helper.session_factory() as session:
             try:

@@ -3,13 +3,14 @@ from zoneinfo import ZoneInfo
 
 from aiogram import Router
 from aiogram.types import Message, CallbackQuery
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from app.services.task_service import TaskService
 from app.keyboards.create_task_keyboards import create_employee_selection_keyboard, create_sector_selection_keyboard
 from core.models.base_model import SectorStatus
+from app.keyboards.deadline_keyboars import create_deadline_keyboard, calculate_deadline_from_callback
 
 
 create_task_router = Router()
@@ -122,30 +123,94 @@ async def process_title(message: Message, state: FSMContext):
 async def process_description(message: Message, state: FSMContext):
     description = message.text.strip()
     await state.update_data(description=description)
-    await message.answer("Укажите дату и время окончания задачи \nВ формате: 01.01.2025 - 22:30")
+
+    keyboard = create_deadline_keyboard()
+    await message.answer("Выберите срок выполнения задачи:", reply_markup=keyboard)
     await state.set_state(CreateTask.waiting_for_deadline)
 
 
-@create_task_router.message(CreateTask.waiting_for_deadline)
-async def process_deadline(message: Message, state: FSMContext):
-    deadline = message.text.strip()
+@create_task_router.callback_query(StateFilter(CreateTask.waiting_for_deadline))
+async def process_deadline_callback(callback_query: CallbackQuery, state: FSMContext):
+    await callback_query.answer()
+
+    data = callback_query.data
+    user_id = callback_query.from_user.id
+
+    if data == "deadline:manual":
+        await callback_query.message.edit_text(
+            "Укажите дату и время окончания задачи в формате: 01.01.2025 - 22:30"
+        )
+        return
+
+    deadline_dt = calculate_deadline_from_callback(data)
+
+    if data == "deadline:never":
+        await state.update_data(deadline=None)
+        await callback_query.message.edit_text("Выбран срок: Бессрочно")
+    elif deadline_dt:
+        await state.update_data(deadline=deadline_dt)
+        await callback_query.message.edit_text(
+            f"Выбран срок: {callback_query.message.text}")
+    else:
+        await callback_query.message.edit_text("Ошибка при выборе срока. Попробуйте снова.")
+        return
+
+    task_data = await state.get_data()
+
+    manager_id = task_data["manager_id"]
+    executor_id = task_data.get("executor_id")
+    sector_task = task_data.get("sector_task")
+    title = task_data["title"]
+    description = task_data["description"]
+
+    result = await TaskService.create_new_task(
+        manager_id=manager_id,
+        executor_id=executor_id,
+        title=title,
+        description=description,
+        deadline=deadline_dt,
+        sector_task=sector_task
+    )
+
+    await state.clear()
+
+    if result['success']:
+        if sector_task:
+            sector_names = {
+                SectorStatus.BAR: "бар",
+                SectorStatus.HALL: "зал",
+                SectorStatus.KITCHEN: "кухня"
+            }
+            sector_name = sector_names.get(sector_task, "неизвестный сектор")
+            await callback_query.message.answer(f"Задача создана и назначена сектору: {sector_name}!")
+        else:
+            await callback_query.message.answer("Задача создана и назначена сотруднику!")
+    else:
+        await callback_query.message.answer(f"Ошибка: {result['message']}")
+
+
+@create_task_router.message(StateFilter(CreateTask.waiting_for_deadline))
+async def process_deadline_manual(message: Message, state: FSMContext):
+    deadline_str = message.text.strip()
 
     try:
-        deadline_dt = datetime.strptime(deadline, "%d.%m.%Y - %H:%M")
+        deadline_dt = datetime.strptime(deadline_str, "%d.%m.%Y - %H:%M")
+        from zoneinfo import ZoneInfo
         kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
         deadline_dt = deadline_dt.replace(tzinfo=kemerovo_tz)
+        await state.update_data(deadline=deadline_dt)
+
     except ValueError:
         await message.answer("Неверный формат даты. Пожалуйста, укажите дату и время в формате: 01.01.2025 - 22:30")
         return
 
-    await state.update_data(deadline=deadline_dt)
-    data = await state.get_data()
+    task_data = await state.get_data()
 
-    manager_id = data["manager_id"]
-    executor_id = data.get("executor_id")
-    sector_task = data.get("sector_task")
-    title = data["title"]
-    description = data["description"]
+    manager_id = task_data["manager_id"]
+    executor_id = task_data.get("executor_id")
+    sector_task = task_data.get("sector_task")
+    title = task_data["title"]
+    description = task_data["description"]
 
     result = await TaskService.create_new_task(
         manager_id=manager_id,
