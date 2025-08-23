@@ -23,7 +23,6 @@ class Task(BaseModel):
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Флаги уведомлений
     notified_24_hours: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     notified_10_hours: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     notified_2_hours: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

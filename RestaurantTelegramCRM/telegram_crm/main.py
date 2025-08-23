@@ -13,10 +13,14 @@ from app.middlewares.access_middleware import CommandAccessMiddleware
 
 from app.services.notification_service import init_notifier
 
-
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logging.getLogger('aiogram').setLevel(logging.WARNING)
+logging.getLogger('app.services.notification_service').setLevel(logging.WARNING)
+logging.getLogger('app.middlewares.overdue_checker_middleware').setLevel(logging.WARNING)
+logging.getLogger('app.services.deadline_notification_service').setLevel(logging.WARNING)
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 async def main():
     bot = Bot(
@@ -25,7 +29,6 @@ async def main():
     )
 
     init_notifier(bot)
-    logger.info("Notifier service initialized.")
 
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
@@ -39,18 +42,14 @@ async def main():
     dp.include_routers(all_routers)
 
     try:
-        logger.info("Starting bot polling...")
         await dp.start_polling(bot)
     finally:
         if hasattr(overdue_middleware, 'stop'):
             overdue_middleware.stop()
-            logger.info("Overdue checker middleware stopped.")
         await bot.session.close()
-        logger.info("Bot session closed.")
-
 
 if __name__ == '__main__':
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Bot stopped by user (KeyboardInterrupt).")
+        pass

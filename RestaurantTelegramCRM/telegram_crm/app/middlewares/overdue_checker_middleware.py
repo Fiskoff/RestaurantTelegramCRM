@@ -12,13 +12,11 @@ from core.db_helper import db_helper
 from app.services.deadline_notification_service import DeadlineNotificationService
 from app.services.overdue_notification_service import OverdueNotificationService
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class OverdueCheckerMiddleware(BaseMiddleware):
-    def __init__(self, bot: Bot, check_interval: int = 300):  # Note: interval 60 in main.py
+    def __init__(self, bot: Bot, check_interval: int = 300):
         self.bot = bot
         self.check_interval = check_interval
         self.kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
@@ -27,7 +25,6 @@ class OverdueCheckerMiddleware(BaseMiddleware):
         self.deadline_notification_service = DeadlineNotificationService(bot)
         self.overdue_notification_service = OverdueNotificationService(self.bot)
 
-
     async def check_deadline_notifications(self):
         current_time = datetime.now(self.kemerovo_tz)
         logger.info(f"Проверка уведомлений о дедлайне: {current_time}")
@@ -35,7 +32,6 @@ class OverdueCheckerMiddleware(BaseMiddleware):
             await self.deadline_notification_service.check_and_notify()
         except Exception as e:
             logger.error(f"Ошибка при проверке уведомлений о дедлайне: {e}")
-
 
     async def check_overdue_tasks(self) -> int:
         current_time = datetime.now(self.kemerovo_tz)
@@ -93,21 +89,19 @@ class OverdueCheckerMiddleware(BaseMiddleware):
 
         return updated_count
 
-
     async def _periodic_check(self):
         self.is_running = True
         logger.info("Сервис проверки задач запущен")
         while self.is_running:
             try:
-                await self.check_deadline_notifications()  # Проверяем уведомления до дедлайна
-                await self.check_overdue_tasks()           # Проверяем просроченные задачи
+                await self.check_deadline_notifications()
+                await self.check_overdue_tasks()
             except asyncio.CancelledError:
                 logger.info("Фоновая задача проверки отменена.")
                 break
             except Exception as e:
                 logger.error(f"Ошибка в периодической проверке: {e}")
             await asyncio.sleep(self.check_interval)
-
 
     async def __call__(
             self,
@@ -118,7 +112,6 @@ class OverdueCheckerMiddleware(BaseMiddleware):
         if self.check_task is None:
             self.check_task = asyncio.create_task(self._periodic_check())
         return await handler(event, data)
-
 
     def stop(self):
         self.is_running = False

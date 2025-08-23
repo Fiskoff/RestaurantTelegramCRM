@@ -1,5 +1,5 @@
 from aiogram import Router
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -37,8 +37,6 @@ async def process_full_name(message: Message, state: FSMContext):
     full_name = message.text.strip()
     await state.update_data(full_name=full_name)
 
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Менеджер", callback_data="role:manager")],
         [InlineKeyboardButton(text="Работник", callback_data="role:staff")]
@@ -63,8 +61,6 @@ async def process_role(callback_query: CallbackQuery, state: FSMContext):
 
     await state.update_data(role=role_mapping[role_str])
     await callback_query.answer()
-
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Бар", callback_data="reg_sector:bar")],

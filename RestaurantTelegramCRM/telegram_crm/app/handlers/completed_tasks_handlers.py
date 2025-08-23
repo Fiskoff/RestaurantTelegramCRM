@@ -1,15 +1,13 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
 
-# Импортируем функции из deadline_keyboards.py
 from app.keyboards.deadline_keyboars import create_deadline_keyboard, calculate_deadline_from_callback
-
 from app.services.task_service import TaskService
 from app.keyboards.select_complete_tasks_keyboards import build_completed_tasks_keyboard
 
@@ -18,7 +16,7 @@ completed_tasks_router = Router()
 
 class TaskCheckUpdateStates(StatesGroup):
     waiting_for_description = State()
-    waiting_for_deadline = State()  # Это состояние будет использоваться и для callback, и для текста
+    waiting_for_deadline = State()
 
 
 @completed_tasks_router.message(Command("completed_tasks"))
@@ -46,7 +44,6 @@ async def get_completed_task_by_id(callback_query: CallbackQuery, state: FSMCont
         await callback_query.answer()
         return
 
-    # Обработка deadline и completed_at с учетом возможного None
     kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
 
     if task.deadline is not None:
@@ -65,7 +62,6 @@ async def get_completed_task_by_id(callback_query: CallbackQuery, state: FSMCont
             completed_at_with_tz = task.completed_at.astimezone(kemerovo_tz)
         completed_at_str = completed_at_with_tz.strftime("%d.%m.%Y %H:%M")
     else:
-        # completed_at обычно не None для выполненных задач, но на всякий случай
         completed_at_str = "Неизвестно"
 
     if task.executor:
@@ -99,7 +95,6 @@ async def get_completed_task_by_id(callback_query: CallbackQuery, state: FSMCont
     else:
         await callback_query.message.answer(response_text)
 
-    # Создаем инлайн клавиатуру вместо реплай клавиатуры
     chek_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Задача закрыта", callback_data="check_task:closed")],
         [InlineKeyboardButton(text="❌ Доработать задачу", callback_data="check_task:refine")],
@@ -186,27 +181,23 @@ async def process_new_description(message: Message, state: FSMContext):
     new_description = f"\nПояснение к исправлению:\n{input_description}\n\nСтарое описание:\n{original_description}"
     await state.update_data(new_description=new_description)
 
-    # Показываем клавиатуру для выбора дедлайна вместо прямого запроса даты
     deadline_kb = create_deadline_keyboard()
     await message.answer("Выберите новый срок выполнения задачи:", reply_markup=deadline_kb)
     await state.set_state(TaskCheckUpdateStates.waiting_for_deadline)
 
 
-# Новый обработчик для CallbackQuery с дедлайном
 @completed_tasks_router.callback_query(StateFilter(TaskCheckUpdateStates.waiting_for_deadline),
                                        lambda c: c.data and c.data.startswith('deadline:'))
 async def process_deadline_callback_for_refinement(callback_query: CallbackQuery, state: FSMContext):
-    """Обрабатывает нажатие на кнопки выбора дедлайна при доработке задачи."""
     await callback_query.answer()
 
     user_data = await state.get_data()
-    # Проверка наличия необходимых данных
     manager_id = user_data.get('original_manager_id')
     executor_id = user_data.get('original_executor_id')
     new_title = user_data.get('new_title')
     new_description = user_data.get('new_description')
 
-    if not all([manager_id, new_title, new_description]):  # executor_id может быть None
+    if not all([manager_id, new_title, new_description]):
         await callback_query.message.answer("Произошла ошибка. Попробуйте начать сначала.")
         await state.clear()
         return
@@ -214,45 +205,37 @@ async def process_deadline_callback_for_refinement(callback_query: CallbackQuery
     data = callback_query.data
 
     if data == "deadline:manual":
-        # Если выбран ручной ввод, просим пользователя ввести дату
         await callback_query.message.edit_text(
             "Укажите новую дату и время окончания задачи в формате: 01.01.2025 - 22:30"
         )
-        # Состояние остается TaskCheckUpdateStates.waiting_for_deadline,
-        # теперь будем ждать текстовое сообщение
         return
 
-    # Пытаемся вычислить дедлайн из callback_data
     new_deadline = calculate_deadline_from_callback(data)
 
-    # --- Продолжаем процесс создания задачи ---
-    # Все данные уже в user_data или вычислены (new_deadline)
     result = await TaskService.create_new_task(
         manager_id=manager_id,
         executor_id=executor_id,
         title=new_title,
         description=new_description,
-        deadline=new_deadline  # Передаем вычисленный deadline или None
+        deadline=new_deadline
     )
 
     if result['success']:
         original_task_id = user_data.get('original_task_id')
         if original_task_id:
             await TaskService.delete_task_for_task_id(original_task_id)
-        await callback_query.message.edit_text("✅ Задача пересоздана!")  # Используем edit_text
+        await callback_query.message.edit_text("✅ Задача пересоздана!")
     else:
-        await callback_query.message.edit_text(f"❌ Ошибка: {result['message']}")  # Используем edit_text
+        await callback_query.message.edit_text(f"❌ Ошибка: {result['message']}")
 
     await state.clear()
 
 
 @completed_tasks_router.message(TaskCheckUpdateStates.waiting_for_deadline)
 async def process_new_deadline_manual(message: Message, state: FSMContext):
-    """Обрабатывает ручной ввод даты дедлайна при доработке задачи."""
     input_deadline = message.text.strip()
     try:
         new_deadline = datetime.strptime(input_deadline, "%d.%m.%Y - %H:%M")
-        # Устанавливаем таймзону
         kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
         new_deadline = new_deadline.replace(tzinfo=kemerovo_tz)
     except ValueError:
@@ -260,24 +243,22 @@ async def process_new_deadline_manual(message: Message, state: FSMContext):
         return
 
     user_data = await state.get_data()
-    # Проверка наличия необходимых данных
     manager_id = user_data.get('original_manager_id')
     executor_id = user_data.get('original_executor_id')
     new_title = user_data.get('new_title')
     new_description = user_data.get('new_description')
 
-    if not all([manager_id, new_title, new_description]):  # executor_id может быть None
+    if not all([manager_id, new_title, new_description]):
         await message.answer("Произошла ошибка. Попробуйте начать сначала.")
         await state.clear()
         return
 
-    # --- Продолжаем процесс создания задачи (как в callback хендлере) ---
     result = await TaskService.create_new_task(
         manager_id=manager_id,
         executor_id=executor_id,
         title=new_title,
         description=new_description,
-        deadline=new_deadline  # Передаем введенную вручную дату
+        deadline=new_deadline
     )
 
     if result['success']:

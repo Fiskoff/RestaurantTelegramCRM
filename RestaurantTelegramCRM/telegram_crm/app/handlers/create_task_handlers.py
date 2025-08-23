@@ -2,13 +2,13 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from aiogram import Router
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from app.services.task_service import TaskService
-from app.keyboards.create_task_keyboards import create_employee_selection_keyboard, create_sector_selection_keyboard
+from app.keyboards.create_task_keyboards import create_employee_selection_keyboard
 from core.models.base_model import SectorStatus
 from app.keyboards.deadline_keyboars import create_deadline_keyboard, calculate_deadline_from_callback
 
@@ -28,9 +28,6 @@ class CreateTask(StatesGroup):
 async def start_create_task(message: Message, state: FSMContext):
     manager_id = message.from_user.id
     await state.update_data(manager_id=manager_id)
-
-    # Создаем инлайн клавиатуру для выбора типа назначения
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👤 Конкретному сотруднику", callback_data="assignment:employee")],
@@ -52,13 +49,10 @@ async def process_assignment_type(callback_query: CallbackQuery, state: FSMConte
                                                reply_markup=keyboard)
         await state.set_state(CreateTask.waiting_for_executor_id)
     elif assignment_type == "sector":
-        # Создаем инлайн клавиатуру для выбора сектора
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🍸 Бар", callback_data="select_sector:bar")],
             [InlineKeyboardButton(text="🍽️ Зал", callback_data="select_sector:hall")],
-            [InlineKeyboardButton(text="‍👨‍🍳 Кухня", callback_data="select_sector:kitchen")],
+            [InlineKeyboardButton(text="👨‍🍳 Кухня", callback_data="select_sector:kitchen")],
             [InlineKeyboardButton(text="❌ Отмена", callback_data="select_sector:cancel")]
         ])
 
@@ -70,12 +64,6 @@ async def process_assignment_type(callback_query: CallbackQuery, state: FSMConte
         await state.clear()
 
     await callback_query.answer()
-
-
-# Удаляем этот хендлер, так как теперь используем callback
-# @create_task_router.message(CreateTask.waiting_for_assignment_type)
-# async def process_assignment_type(message: Message, state: FSMContext):
-#     # ... старый код ...
 
 
 @create_task_router.callback_query(lambda c: c.data and c.data.startswith('select_employee:'))
@@ -99,7 +87,6 @@ async def process_sector_selection(callback_query: CallbackQuery, state: FSMCont
     try:
         sector_str = callback_query.data.split(':')[1]
 
-        # Проверяем, если пользователь выбрал отмену
         if sector_str == "cancel":
             await callback_query.message.edit_text("Создание задачи отменено!")
             await state.clear()
@@ -125,12 +112,6 @@ async def process_sector_selection(callback_query: CallbackQuery, state: FSMCont
     except (IndexError, ValueError):
         await callback_query.answer("Ошибка при обработке выбора сектора.", show_alert=True)
         return
-
-
-# Удаляем этот хендлер, так как теперь используем callback
-# @create_task_router.message(CreateTask.waiting_for_executor_id)
-# async def process_executor(message: Message, state: FSMContext):
-#     # ... старый код ...
 
 
 @create_task_router.message(CreateTask.waiting_for_title)
@@ -217,7 +198,6 @@ async def process_deadline_manual(message: Message, state: FSMContext):
 
     try:
         deadline_dt = datetime.strptime(deadline_str, "%d.%m.%Y - %H:%M")
-        from zoneinfo import ZoneInfo
         kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
         deadline_dt = deadline_dt.replace(tzinfo=kemerovo_tz)
         await state.update_data(deadline=deadline_dt)

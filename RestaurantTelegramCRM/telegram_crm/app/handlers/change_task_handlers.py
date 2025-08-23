@@ -1,14 +1,13 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from app.keyboards.deadline_keyboars import create_deadline_keyboard, calculate_deadline_from_callback
-
 from app.keyboards.change_task_keyboars import build_delete_tasks_keyboard, build_update_tasks_keyboard
 from app.services.task_service import TaskService
 from app.services.user_service import UserService
@@ -44,7 +43,6 @@ def format_deadline(deadline: datetime | None) -> str:
 
 @change_task_router.message(Command("change_task"))
 async def get_change_task_keyboard(message: Message):
-    # Создаем инлайн клавиатуру вместо реплай клавиатуры
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✏️ Изменить задачу", callback_data="action:update")],
         [InlineKeyboardButton(text="❌ Удалить задачу", callback_data="action:delete")]
@@ -112,7 +110,6 @@ async def start_change_task(callback_query: CallbackQuery, state: FSMContext):
 
     await callback_query.message.answer(task_info)
 
-    # Создаем инлайн клавиатуру для выбора поля
     field_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📝 Название", callback_data="field:title")],
         [InlineKeyboardButton(text="📄 Описание", callback_data="field:description")],
@@ -136,7 +133,6 @@ async def process_field_choice(callback_query: CallbackQuery, state: FSMContext)
     if field == 'cancel':
         await callback_query.message.edit_text("Редактирование задачи отменено.")
         await state.clear()
-        # Показываем главное меню снова
         main_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="✏️ Изменить задачу", callback_data="action:update")],
             [InlineKeyboardButton(text="❌ Удалить задачу", callback_data="action:delete")]
@@ -233,7 +229,6 @@ async def process_deadline_callback(callback_query: CallbackQuery, state: FSMCon
             f"Дедлайн: {deadline_str}\n"
         )
 
-        # Клавиатура для продолжения
         continue_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="✅ Продолжить редактирование", callback_data="continue:yes")],
             [InlineKeyboardButton(text="⏹️ Завершить", callback_data="continue:no")]
@@ -303,7 +298,6 @@ async def process_sector_choice(callback_query: CallbackQuery, state: FSMContext
             f"Дедлайн: {deadline_str}\n"
         )
 
-        # Создаем инлайн клавиатуру для выбора поля
         field_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📝 Название", callback_data="field:title")],
             [InlineKeyboardButton(text="📄 Описание", callback_data="field:description")],
@@ -351,7 +345,6 @@ async def process_sector_choice(callback_query: CallbackQuery, state: FSMContext
             f"Дедлайн: {deadline_str}\n"
         )
 
-        # Клавиатура для продолжения
         continue_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="✅ Продолжить редактирование", callback_data="continue:yes")],
             [InlineKeyboardButton(text="⏹️ Завершить", callback_data="continue:no")]
@@ -438,7 +431,6 @@ async def process_new_value(message: Message, state: FSMContext):
                 f"Дедлайн: {deadline_str}\n"
             )
 
-            # Клавиатура для продолжения
             continue_keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="✅ Продолжить редактирование", callback_data="continue:yes")],
                 [InlineKeyboardButton(text="⏹️ Завершить", callback_data="continue:no")]
@@ -490,7 +482,6 @@ async def process_continue_editing(callback_query: CallbackQuery, state: FSMCont
             f"Дедлайн: {deadline_str}\n"
         )
 
-        # Создаем инлайн клавиатуру для выбора поля
         field_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📝 Название", callback_data="field:title")],
             [InlineKeyboardButton(text="📄 Описание", callback_data="field:description")],
@@ -505,7 +496,6 @@ async def process_continue_editing(callback_query: CallbackQuery, state: FSMCont
 
     elif callback_query.data == "continue:no":
         await callback_query.message.edit_text("Редактирование задачи завершено.")
-        # Показываем главное меню снова
         main_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="✏️ Изменить задачу", callback_data="action:update")],
             [InlineKeyboardButton(text="❌ Удалить задачу", callback_data="action:delete")]
@@ -545,7 +535,6 @@ async def start_delete_task(callback_query: CallbackQuery, state: FSMContext):
         f"Дедлайн: {deadline_str}\n"
     )
 
-    # Клавиатура для подтверждения удаления
     confirm_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Да, удалить", callback_data=f"confirm_delete:yes:{task_id}")],
         [InlineKeyboardButton(text="❌ Нет, отменить", callback_data="confirm_delete:no")]
@@ -565,7 +554,6 @@ async def process_delete_task(callback_query: CallbackQuery, state: FSMContext):
         task_id = int(data_parts[2])
         await TaskService.delete_task_for_task_id(task_id)
         await callback_query.message.edit_text("✅ Задача удалена")
-        # Показываем главное меню снова
         main_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="✏️ Изменить задачу", callback_data="action:update")],
             [InlineKeyboardButton(text="❌ Удалить задачу", callback_data="action:delete")]
@@ -573,7 +561,6 @@ async def process_delete_task(callback_query: CallbackQuery, state: FSMContext):
         await callback_query.message.answer("Изменение существующей задачи", reply_markup=main_keyboard)
     elif data_parts[1] == "no":
         await callback_query.message.edit_text("❌ Задача не была удалена")
-        # Показываем главное меню снова
         main_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="✏️ Изменить задачу", callback_data="action:update")],
             [InlineKeyboardButton(text="❌ Удалить задачу", callback_data="action:delete")]

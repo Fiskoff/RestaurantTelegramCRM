@@ -3,9 +3,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from app.services.task_service import TaskService
-from core.models.base_model import TaskStatus
-from core.models.base_model import SectorStatus
-
+from core.models.base_model import TaskStatus, SectorStatus
 
 staff_tasks_router = Router()
 

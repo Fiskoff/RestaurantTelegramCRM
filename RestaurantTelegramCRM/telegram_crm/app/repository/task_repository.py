@@ -5,13 +5,10 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, update, delete, or_, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 from core.models import Task, TaskStatus, User
 from core.models.base_model import SectorStatus
 
-
 logger = logging.getLogger(__name__)
-
 
 class TaskRepository:
     def __init__(self, async_session: AsyncSession):
@@ -30,16 +27,13 @@ class TaskRepository:
         self.session.add(new_task)
         await self.session.commit()
 
-
     async def get_all_task_for_executor(self, executor_id: int):
         result = await self.session.execute(select(Task).where(Task.executor_id == executor_id))
         return result.scalars().all()
 
-
     async def get_task_by_id(self, task_id: int):
         result = await self.session.execute(select(Task).where(Task.task_id == task_id))
         return result.scalars().first()
-
 
     async def update_status_task(self, current_time):
         stmt = (
@@ -50,7 +44,6 @@ class TaskRepository:
         result = await self.session.execute(stmt)
         await self.session.commit()
         return result.rowcount
-
 
     async def get_all_overdue_tasks_command(self):
         stmt_with_executor = (
@@ -79,7 +72,6 @@ class TaskRepository:
 
         return all_overdue_tasks
 
-
     async def get_all_overdue_tasks(self):
         stmt_with_executor = (
             select(Task, User)
@@ -107,21 +99,6 @@ class TaskRepository:
 
         return overdue_tasks_with_users, overdue_tasks_for_sector
 
-
-    async def mark_tasks_as_notified_overdue(self, task_ids: list[int]):
-        if not task_ids:
-            logger.debug("No task IDs provided to mark as notified overdue.")
-            return
-        stmt = (
-            update(Task)
-            .where(Task.task_id.in_(task_ids))
-            .values(notified_overdue=True)
-        )
-        result = await self.session.execute(stmt)
-        await self.session.commit()
-        logger.info(f"Marked {len(task_ids)} tasks as notified overdue (DB rows affected: {result.rowcount}).")
-
-
     async def mark_tasks_as_notified_overdue(self, task_ids: list[int]):
         if not task_ids:
             return
@@ -133,7 +110,6 @@ class TaskRepository:
         await self.session.execute(stmt)
         await self.session.commit()
         logger.info(f"Marked {len(task_ids)} tasks as notified overdue.")
-
 
     async def complete_task(self, task_id: int, comment: str = None, photo_url: str = None, executor_id: int = None):
         kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
@@ -158,11 +134,9 @@ class TaskRepository:
         await self.session.commit()
         return result.rowcount
 
-
     async def get_completed_tasks(self):
         result = await self.session.execute(select(Task).where(Task.status == TaskStatus.COMPLETED))
         return result.scalars().all()
-
 
     async def get_task_by_id_and_staff(self, task_id: int):
         stmt = (
@@ -173,16 +147,13 @@ class TaskRepository:
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
-
     async def delete_task_for_task_id(self, task_id):
         await self.session.execute(delete(Task).where(Task.task_id == task_id))
         await self.session.commit()
 
-
-    async  def get_activ_and_overdue_tasks(self):
+    async def get_activ_and_overdue_tasks(self):
         result = await self.session.execute(select(Task).where(Task.status != TaskStatus.COMPLETED))
         return result.scalars().all()
-
 
     async def update_task_field(self, task_id: int, field: str, new_value):
         field_mapping = {
@@ -208,7 +179,6 @@ class TaskRepository:
         if result.rowcount == 0:
             raise ValueError("Задача не найдена")
 
-
     async def get_staff_tasks(self):
         stmt = select(Task).where(
             or_(
@@ -219,7 +189,6 @@ class TaskRepository:
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
-
     async def get_sector_tasks(self, sector: SectorStatus):
         result = await self.session.execute(
             select(Task).where(
@@ -229,7 +198,6 @@ class TaskRepository:
         )
         return result.scalars().all()
 
-
     async def get_active_tasks_for_notification(self) -> list[Task]:
         kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
         current_time = datetime.now(kemerovo_tz)
@@ -238,7 +206,7 @@ class TaskRepository:
             select(Task)
             .where(
                 Task.status == TaskStatus.ACTIVE,
-                Task.deadline >= current_time.replace(tzinfo=None),  # Сравниваем naive datetime
+                Task.deadline >= current_time.replace(tzinfo=None),
                 Task.deadline <= future_time.replace(tzinfo=None)
             )
         )

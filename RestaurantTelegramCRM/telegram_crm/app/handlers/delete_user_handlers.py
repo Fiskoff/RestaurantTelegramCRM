@@ -6,7 +6,6 @@ from aiogram.fsm.state import StatesGroup, State
 
 from app.services.user_service import UserService
 
-
 delete_user_router = Router()
 
 

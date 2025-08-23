@@ -21,15 +21,9 @@ class TaskCompletionStates(StatesGroup):
 
 
 def is_task_active(task_deadline: datetime | None, current_time: datetime) -> bool:
-    """
-    Проверяет, является ли задача активной.
-    Задача без дедлайна считается всегда активной.
-    """
     if task_deadline is None:
-        return True  # Задачи без дедлайна всегда активны
-    # Для задач с дедлайном проверяем дату
+        return True
     kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
-    # Убедимся, что у дедлайна есть таймзона
     if task_deadline.tzinfo is None:
         deadline_with_tz = task_deadline.replace(tzinfo=kemerovo_tz)
     else:
@@ -41,46 +35,7 @@ def is_task_active(task_deadline: datetime | None, current_time: datetime) -> bo
 @my_task_router.message(Command("my_tasks"))
 async def get_my_tasks(message: Message, state: FSMContext):
     await state.clear()
-    telegram_id = message.from_user.id
-
-    user = await UserService.get_user_by_telegram_id(telegram_id)
-    if not user:
-        await message.answer("❌ Пользователь не найден")
-        return
-
-    user_sector = user.sector
-
-    personal_tasks = await TaskService.get_tasks_user(telegram_id)
-
-    sector_tasks = []
-    if user_sector:
-        sector_tasks = await TaskService.get_sector_tasks(user_sector)
-
-    all_tasks = list(personal_tasks)
-    task_ids = {task.task_id for task in personal_tasks}
-
-    for sector_task in sector_tasks:
-        if sector_task.task_id not in task_ids:
-            all_tasks.append(sector_task)
-
-    if not all_tasks:
-        await message.answer("У вас пока нет личных задач")
-        return
-
-    kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
-    current_time = datetime.now(kemerovo_tz)
-
-    active_tasks = [t for t in all_tasks if is_task_active(t.deadline, current_time)]
-    overdue_tasks = [t for t in all_tasks if not is_task_active(t.deadline, current_time) and t.deadline is not None]
-
-    active_text = format_tasks_list(active_tasks, "🟢 Активные задачи:")
-    overdue_text = format_tasks_list(overdue_tasks, "🔴 Просроченные задачи:")
-
-    full_text = active_text + "\n" + overdue_text if (active_text or overdue_text) else "Нет задач для отображения."
-
-    await message.answer(full_text, parse_mode="HTML")
-    keyboard = build_tasks_keyboard(all_tasks)
-    await message.answer("Выберите задачу:", reply_markup=keyboard)
+    await show_user_tasks(message)
 
 
 @my_task_router.callback_query(lambda c: c.data and c.data.startswith('select_tasks:'))
@@ -112,7 +67,6 @@ async def get_task_by_id(callback_query: CallbackQuery, state: FSMContext):
         f"⏰ Дедлайн: {deadline_str}\n"
     )
 
-    # Создаем инлайн клавиатуру вместо реплай клавиатуры
     task_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Задача выполнена", callback_data="task_action:completed")],
         [InlineKeyboardButton(text="📋 Вернуться к списку задач", callback_data="task_action:return")]
@@ -127,7 +81,6 @@ async def handle_task_action(callback_query: CallbackQuery, state: FSMContext):
     action = callback_query.data.split(':')[1]
 
     if action == 'completed':
-        # Создаем инлайн клавиатуру для отчета
         report_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📤 Отправить отчёт", callback_data="report_action:send")],
             [InlineKeyboardButton(text="❌ Отменить отправку отчёта", callback_data="report_action:cancel")]
@@ -144,7 +97,7 @@ async def handle_task_action(callback_query: CallbackQuery, state: FSMContext):
     elif action == 'return':
         await state.clear()
         await callback_query.message.edit_text("↩️ Возвращаемся к списку задач...")
-        await show_tasks_list(callback_query.message)
+        await show_user_tasks(callback_query.message, send_welcome=False)
 
     await callback_query.answer()
 
@@ -190,7 +143,7 @@ async def handle_report_action(callback_query: CallbackQuery, state: FSMContext)
             )
 
         await state.clear()
-        await show_tasks_list(callback_query.message)
+        await show_user_tasks(callback_query.message, send_welcome=False)
 
     elif action == 'cancel':
         current_state = await state.get_state()
@@ -204,7 +157,7 @@ async def handle_report_action(callback_query: CallbackQuery, state: FSMContext)
             "Задача не была выполнена."
         )
 
-        await show_tasks_list(callback_query.message)
+        await show_user_tasks(callback_query.message, send_welcome=False)
 
     await callback_query.answer()
 
@@ -230,19 +183,37 @@ async def handle_photo(message: Message, state: FSMContext):
     await message.answer("📸 Фотография сохранена. Можете отправить еще материалы или выбрать действие.")
 
 
-async def show_tasks_list(message: Message):
+async def show_user_tasks(message: Message, send_welcome: bool = True):
     telegram_id = message.from_user.id
-    tasks = await TaskService.get_tasks_user(telegram_id)
 
-    if not tasks:
-        await message.answer("У вас пока нет задач.")
+    user = await UserService.get_user_by_telegram_id(telegram_id)
+    if not user and send_welcome:
+        await message.answer("❌ Пользователь не найден")
         return
+
+    if not user:
+        return
+
+    user_sector = user.sector
+
+    personal_tasks = await TaskService.get_tasks_user(telegram_id)
+
+    sector_tasks = []
+    if user_sector:
+        sector_tasks = await TaskService.get_sector_tasks(user_sector)
+
+    all_tasks = list(personal_tasks)
+    task_ids = {task.task_id for task in personal_tasks}
+
+    for sector_task in sector_tasks:
+        if sector_task.task_id not in task_ids:
+            all_tasks.append(sector_task)
 
     kemerovo_tz = ZoneInfo("Asia/Krasnoyarsk")
     current_time = datetime.now(kemerovo_tz)
 
-    active_tasks = [t for t in tasks if is_task_active(t.deadline, current_time)]
-    overdue_tasks = [t for t in tasks if not is_task_active(t.deadline, current_time) and t.deadline is not None]
+    active_tasks = [t for t in all_tasks if is_task_active(t.deadline, current_time)]
+    overdue_tasks = [t for t in all_tasks if not is_task_active(t.deadline, current_time) and t.deadline is not None]
 
     active_text = format_tasks_list(active_tasks, "🟢 Активные задачи:")
     overdue_text = format_tasks_list(overdue_tasks, "🔴 Просроченные задачи:")
@@ -250,6 +221,5 @@ async def show_tasks_list(message: Message):
     full_text = active_text + "\n" + overdue_text if (active_text or overdue_text) else "Нет задач для отображения."
 
     await message.answer(full_text, parse_mode="HTML")
-
-    keyboard = build_tasks_keyboard(tasks)
+    keyboard = build_tasks_keyboard(all_tasks)
     await message.answer("Выберите задачу:", reply_markup=keyboard)

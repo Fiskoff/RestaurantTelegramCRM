@@ -15,7 +15,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 class DeadlineNotificationService:
     def __init__(self, bot: "Bot"):
         self.bot = bot
@@ -41,7 +40,6 @@ class DeadlineNotificationService:
                         logger.error(f"Ошибка обработки задачи {task.task_id} для уведомления: {e}")
 
                 if tasks_to_update:
-                    # Обновляем задачи в базе данных
                     for task in tasks_to_update:
                         session.add(task)
                     await session.commit()
@@ -59,7 +57,6 @@ class DeadlineNotificationService:
             logger.debug(f"Пропущена задача {task.task_id} без дедлайна.")
             return False
 
-        # Приводим дедлайн к осведомленному времени
         if task.deadline.tzinfo is None:
             deadline_aware = task.deadline.replace(tzinfo=self.kemerovo_tz)
         else:
@@ -75,21 +72,18 @@ class DeadlineNotificationService:
 
         notification_sent = False
 
-        # Уведомление за 24 часа (когда осталось от 23 до 25 часов)
         if 23.0 <= hours_left <= 25.0 and not task.notified_24_hours:
             await self._send_notification(task, "за 24 часа")
             task.notified_24_hours = True
             notification_sent = True
             logger.info(f"Отправлено уведомление 'за 24 часа' по задаче {task.task_id}")
 
-        # Уведомление за 10 часов (когда осталось от 9 до 11 часов)
         elif 9.0 <= hours_left <= 11.0 and not task.notified_10_hours:
             await self._send_notification(task, "за 10 часов")
             task.notified_10_hours = True
             notification_sent = True
             logger.info(f"Отправлено уведомление 'за 10 часов' по задаче {task.task_id}")
 
-        # Уведомление за 2 часа (когда осталось от 1 до 3 часов)
         elif 1.0 <= hours_left <= 3.0 and not task.notified_2_hours:
             await self._send_notification(task, "за 2 часа")
             task.notified_2_hours = True

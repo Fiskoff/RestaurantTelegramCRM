@@ -6,7 +6,6 @@ from aiogram.types import TelegramObject, Message
 from app.services.user_service import UserService
 from core.models.base_model import UserRole
 
-
 ROLE_STAFF = "STAFF"
 ROLE_MANAGER = "MANAGER"
 
@@ -16,9 +15,8 @@ ACCESS_RULES = {
 
 ALL_PROTECTED_COMMANDS = [
     "create_task", "my_tasks", "all_overdue_task",
-    "completed_tasks", "change_task", "delete_task", "staff_tasks",
+    "completed_tasks", "change_task", "delete_user", "staff_tasks",
 ]
-
 
 class CommandAccessMiddleware(BaseMiddleware):
     async def __call__(

@@ -3,7 +3,6 @@ from app.repository.user_repository import UserRepository
 from core.models import User
 from core.models.base_model import UserRole, SectorStatus
 
-
 class UserService:
     @staticmethod
     async def get_user_by_telegram_id(telegram_id: int):

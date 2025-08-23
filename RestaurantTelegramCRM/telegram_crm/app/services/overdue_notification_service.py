@@ -4,12 +4,10 @@ from typing import TYPE_CHECKING
 from core.models import Task, SectorStatus
 from app.services.user_service import UserService
 
-
 if TYPE_CHECKING:
     from aiogram import Bot
 
 logger = logging.getLogger(__name__)
-
 
 class OverdueNotificationService:
     def __init__(self, bot: "Bot"):
@@ -24,7 +22,6 @@ class OverdueNotificationService:
             logger.info(f"Overdue notification sent successfully to user {chat_id}.")
         except Exception as e:
             logger.error(f"Failed to send overdue notification to user {chat_id}: {e}")
-
 
     async def notify_overdue_task(self, task: Task):
         if not self.bot:
@@ -85,4 +82,3 @@ class OverdueNotificationService:
 
         except Exception as e:
             logger.error(f"Error in notify_overdue_task for task {task.task_id}: {e}")
-

@@ -4,21 +4,17 @@ from typing import TYPE_CHECKING
 from core.models import Task, SectorStatus
 from app.services.user_service import UserService
 
-
 if TYPE_CHECKING:
     from aiogram import Bot
 
 logger = logging.getLogger(__name__)
 
-
 _bot_instance: 'Bot | None' = None
-
 
 def init_notifier(bot: 'Bot'):
     global _bot_instance
     _bot_instance = bot
     logger.info("Notifier service initialized with bot instance.")
-
 
 async def _send_message(chat_id: int, text: str):
     if not _bot_instance:
@@ -30,7 +26,6 @@ async def _send_message(chat_id: int, text: str):
         logger.info(f"Notification sent successfully to user {chat_id}.")
     except Exception as e:
         logger.error(f"Failed to send notification to user {chat_id}: {e}")
-
 
 async def notify_new_task(task: Task):
     if not _bot_instance:
@@ -80,7 +75,6 @@ async def notify_new_task(task: Task):
 
     except Exception as e:
         logger.error(f"Error in notify_new_task for task {task.task_id}: {e}")
-
 
 async def notify_updated_task(old_task: Task, new_task: Task):
     if not _bot_instance:
@@ -150,7 +144,6 @@ async def notify_updated_task(old_task: Task, new_task: Task):
     except Exception as e:
         logger.error(f"Error in notify_updated_task for task {new_task.task_id}: {e}")
 
-
 async def notify_deleted_task(task: Task):
     if not _bot_instance:
         logger.warning("Bot instance not initialized, skipping deleted task notification.")
@@ -181,7 +174,6 @@ async def notify_deleted_task(task: Task):
 
     except Exception as e:
         logger.error(f"Error in notify_deleted_task for task {task.task_id}: {e}")
-
 
 async def notify_manager_task_completed(task: Task, employee_full_name: str):
     if not _bot_instance:
