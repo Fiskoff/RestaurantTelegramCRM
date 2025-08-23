@@ -37,7 +37,6 @@ async def process_full_name(message: Message, state: FSMContext):
     full_name = message.text.strip()
     await state.update_data(full_name=full_name)
 
-    # Создаем инлайн клавиатуру для выбора роли
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -65,27 +64,20 @@ async def process_role(callback_query: CallbackQuery, state: FSMContext):
     await state.update_data(role=role_mapping[role_str])
     await callback_query.answer()
 
-    # Создаем инлайн клавиатуру для выбора сектора
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Бар", callback_data="sector:bar")],
-        [InlineKeyboardButton(text="Зал", callback_data="sector:hall")],
-        [InlineKeyboardButton(text="Кухня", callback_data="sector:kitchen")],
-        [InlineKeyboardButton(text="Нет рабочей зоны", callback_data="sector:none")]
+        [InlineKeyboardButton(text="Бар", callback_data="reg_sector:bar")],
+        [InlineKeyboardButton(text="Зал", callback_data="reg_sector:hall")],
+        [InlineKeyboardButton(text="Кухня", callback_data="reg_sector:kitchen")],
+        [InlineKeyboardButton(text="Нет рабочей зоны", callback_data="reg_sector:none")]
     ])
 
     await callback_query.message.edit_text("Укажите рабочую зону:", reply_markup=keyboard)
     await state.set_state(Registration.waiting_for_sector)
 
 
-# Удаляем старый хендлер, так как теперь используем callback
-# @register_router.message(Registration.waiting_for_role)
-# async def process_role(message: Message, state: FSMContext):
-#     # ... старый код ...
-
-
-@register_router.callback_query(lambda c: c.data and c.data.startswith('sector:'))
+@register_router.callback_query(lambda c: c.data and c.data.startswith('reg_sector:'))
 async def process_sector(callback_query: CallbackQuery, state: FSMContext):
     sector_str = callback_query.data.split(':')[1]
 
@@ -104,12 +96,6 @@ async def process_sector(callback_query: CallbackQuery, state: FSMContext):
     await callback_query.answer()
     await callback_query.message.edit_text("Отлично! Теперь укажите вашу должность:")
     await state.set_state(Registration.waiting_for_position)
-
-
-# Удаляем старый хендлер, так как теперь используем callback
-# @register_router.message(Registration.waiting_for_sector)
-# async def process_se(message: Message, state: FSMContext):
-#     # ... старый код ...
 
 
 @register_router.message(Registration.waiting_for_position)
