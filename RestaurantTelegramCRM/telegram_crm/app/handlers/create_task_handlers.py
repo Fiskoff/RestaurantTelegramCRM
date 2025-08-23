@@ -33,9 +33,9 @@ async def start_create_task(message: Message, state: FSMContext):
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Конкретному сотруднику", callback_data="assignment:employee")],
-        [InlineKeyboardButton(text="Всему сектору", callback_data="assignment:sector")],
-        [InlineKeyboardButton(text="Отменить создание задачи", callback_data="assignment:cancel")]
+        [InlineKeyboardButton(text="👤 Конкретному сотруднику", callback_data="assignment:employee")],
+        [InlineKeyboardButton(text="🏢 Всему сектору", callback_data="assignment:sector")],
+        [InlineKeyboardButton(text="❌ Отменить создание задачи", callback_data="assignment:cancel")]
     ])
 
     await message.answer("Как вы хотите назначить задачу?", reply_markup=keyboard)
@@ -56,10 +56,10 @@ async def process_assignment_type(callback_query: CallbackQuery, state: FSMConte
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Бар", callback_data="select_sector:bar")],
-            [InlineKeyboardButton(text="Зал", callback_data="select_sector:hall")],
-            [InlineKeyboardButton(text="Кухня", callback_data="select_sector:kitchen")],
-            [InlineKeyboardButton(text="Отмена", callback_data="select_sector:cancel")]
+            [InlineKeyboardButton(text="🍸 Бар", callback_data="select_sector:bar")],
+            [InlineKeyboardButton(text="🍽️ Зал", callback_data="select_sector:hall")],
+            [InlineKeyboardButton(text="‍👨‍🍳 Кухня", callback_data="select_sector:kitchen")],
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="select_sector:cancel")]
         ])
 
         await callback_query.message.edit_text("Выберите сектор, которому хотите назначить задачу:",

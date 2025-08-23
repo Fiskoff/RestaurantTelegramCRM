@@ -2,13 +2,12 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from app.keyboards.select_all_task_keyboard import format_tasks_list, build_tasks_keyboard
-from app.keyboards.task_reply_keyboard import get_task_action_keyboard, get_report_action_keyboard, get_remove_keyboard
 from app.services.task_service import TaskService
 from app.services.user_service import UserService
 from app.services.notification_service import notify_manager_task_completed
@@ -113,81 +112,101 @@ async def get_task_by_id(callback_query: CallbackQuery, state: FSMContext):
         f"⏰ Дедлайн: {deadline_str}\n"
     )
 
-    reply_keyboard = get_task_action_keyboard()
+    # Создаем инлайн клавиатуру вместо реплай клавиатуры
+    task_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Задача выполнена", callback_data="task_action:completed")],
+        [InlineKeyboardButton(text="📋 Вернуться к списку задач", callback_data="task_action:return")]
+    ])
 
-    await callback_query.message.answer(response_text, reply_markup=reply_keyboard)
+    await callback_query.message.answer(response_text, reply_markup=task_keyboard)
     await callback_query.answer()
 
 
-@my_task_router.message(F.text == "✅ Задача выполнена")
-async def task_completed_start(message: Message, state: FSMContext):
-    report_keyboard = get_report_action_keyboard()
-    await message.answer(
-        "Пожалуйста, отправьте отчет о выполнении задачи.\n"
-        "Вы можете отправить текстовый комментарий и/или фотографию.\n"
-        "После отправки материалов нажмите '📤 Отправить отчёт' или '❌ Отменить отправку отчёта'",
-        reply_markup=report_keyboard
-    )
-    await state.set_state(TaskCompletionStates.waiting_for_report)
+@my_task_router.callback_query(lambda c: c.data and c.data.startswith('task_action:'))
+async def handle_task_action(callback_query: CallbackQuery, state: FSMContext):
+    action = callback_query.data.split(':')[1]
+
+    if action == 'completed':
+        # Создаем инлайн клавиатуру для отчета
+        report_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📤 Отправить отчёт", callback_data="report_action:send")],
+            [InlineKeyboardButton(text="❌ Отменить отправку отчёта", callback_data="report_action:cancel")]
+        ])
+
+        await callback_query.message.answer(
+            "Пожалуйста, отправьте отчет о выполнении задачи.\n"
+            "Вы можете отправить текстовый комментарий и/или фотографию.\n"
+            "После отправки материалов нажмите '📤 Отправить отчёт' или '❌ Отменить отправку отчёта'",
+            reply_markup=report_keyboard
+        )
+        await state.set_state(TaskCompletionStates.waiting_for_report)
+
+    elif action == 'return':
+        await state.clear()
+        await callback_query.message.edit_text("↩️ Возвращаемся к списку задач...")
+        await show_tasks_list(callback_query.message)
+
+    await callback_query.answer()
 
 
-@my_task_router.message(F.text == "📤 Отправить отчёт")
-async def send_report(message: Message, state: FSMContext):
-    current_state = await state.get_state()
-    if current_state != TaskCompletionStates.waiting_for_report:
-        return
+@my_task_router.callback_query(lambda c: c.data and c.data.startswith('report_action:'))
+async def handle_report_action(callback_query: CallbackQuery, state: FSMContext):
+    action = callback_query.data.split(':')[1]
 
-    user_data = await state.get_data()
-    task_id = user_data.get("task_id")
-    comments = user_data.get("comments", [])
-    photos = user_data.get("photos", [])
+    if action == 'send':
+        current_state = await state.get_state()
+        if current_state != TaskCompletionStates.waiting_for_report:
+            return
 
-    comment = "\n".join(comments) if comments else None
-    photo_url = ",".join(photos) if photos else None
+        user_data = await state.get_data()
+        task_id = user_data.get("task_id")
+        comments = user_data.get("comments", [])
+        photos = user_data.get("photos", [])
 
-    task = await TaskService.get_task_by_id(task_id)
+        comment = "\n".join(comments) if comments else None
+        photo_url = ",".join(photos) if photos else None
 
-    executor_id = None
-    if not task.executor_id:
-        executor_id = message.from_user.id
+        task = await TaskService.get_task_by_id(task_id)
 
-    result = await TaskService.complete_task(task_id, comment, photo_url, executor_id)
+        executor_id = None
+        if not task.executor_id:
+            executor_id = callback_query.from_user.id
 
-    if result["success"]:
-        try:
-            updated_task = await TaskService.get_task_by_id(task_id)
-            employee_user = await UserService.get_user_by_telegram_id(message.from_user.id)
-            employee_name = f"{employee_user.full_name} - {employee_user.position}" if employee_user else "Неизвестный сотрудник"
+        result = await TaskService.complete_task(task_id, comment, photo_url, executor_id)
 
-            await notify_manager_task_completed(updated_task, employee_name)
-        except Exception as notify_error:
-            print(f"Ошибка при отправке уведомления менеджеру о выполнении задачи {task_id}: {notify_error}")
+        if result["success"]:
+            try:
+                updated_task = await TaskService.get_task_by_id(task_id)
+                employee_user = await UserService.get_user_by_telegram_id(callback_query.from_user.id)
+                employee_name = f"{employee_user.full_name} - {employee_user.position}" if employee_user else "Неизвестный сотрудник"
 
-        await message.answer(
-            "✅ Отчёт успешно отправлен!\n"
-            "Задача отмечена как выполненная!",
-            reply_markup=get_remove_keyboard()
+                await notify_manager_task_completed(updated_task, employee_name)
+            except Exception as notify_error:
+                print(f"Ошибка при отправке уведомления менеджеру о выполнении задачи {task_id}: {notify_error}")
+
+            await callback_query.message.edit_text(
+                "✅ Отчёт успешно отправлен!\n"
+                "Задача отмечена как выполненная!"
+            )
+
+        await state.clear()
+        await show_tasks_list(callback_query.message)
+
+    elif action == 'cancel':
+        current_state = await state.get_state()
+        if current_state != TaskCompletionStates.waiting_for_report:
+            return
+
+        await state.clear()
+
+        await callback_query.message.edit_text(
+            "↩️ Отправка отчёта отменена.\n"
+            "Задача не была выполнена."
         )
 
-    await state.clear()
-    await show_tasks_list(message)
+        await show_tasks_list(callback_query.message)
 
-
-@my_task_router.message(F.text == "❌ Отменить отправку отчёта")
-async def cancel_report(message: Message, state: FSMContext):
-    current_state = await state.get_state()
-    if current_state != TaskCompletionStates.waiting_for_report:
-        return
-
-    await state.clear()
-
-    await message.answer(
-        "↩️ Отправка отчёта отменена.\n"
-        "Задача не была выполнена.",
-        reply_markup=get_remove_keyboard()
-    )
-
-    await show_tasks_list(message)
+    await callback_query.answer()
 
 
 @my_task_router.message(TaskCompletionStates.waiting_for_report, F.text)
@@ -234,12 +253,3 @@ async def show_tasks_list(message: Message):
 
     keyboard = build_tasks_keyboard(tasks)
     await message.answer("Выберите задачу:", reply_markup=keyboard)
-
-
-@my_task_router.message(lambda message: message.text == "📋 Вернуться к списку задач")
-async def return_to_tasks_list(message: Message, state: FSMContext):
-    await state.clear()
-
-    await message.answer("↩️ Возвращаемся к списку задач...", reply_markup=get_remove_keyboard())
-
-    await show_tasks_list(message)
