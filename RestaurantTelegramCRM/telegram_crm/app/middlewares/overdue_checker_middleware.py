@@ -99,8 +99,8 @@ class OverdueCheckerMiddleware(BaseMiddleware):
         logger.info("Сервис проверки задач запущен")
         while self.is_running:
             try:
-                await self.check_deadline_notifications()
-                await self.check_overdue_tasks()
+                await self.check_deadline_notifications()  # Проверяем уведомления до дедлайна
+                await self.check_overdue_tasks()           # Проверяем просроченные задачи
             except asyncio.CancelledError:
                 logger.info("Фоновая задача проверки отменена.")
                 break

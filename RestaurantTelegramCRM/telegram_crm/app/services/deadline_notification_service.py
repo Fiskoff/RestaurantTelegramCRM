@@ -1,4 +1,3 @@
-import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import TYPE_CHECKING
@@ -9,9 +8,10 @@ from core.models.base_model import SectorStatus, TaskStatus
 from app.repository.task_repository import TaskRepository
 from app.services.user_service import UserService
 
-
 if TYPE_CHECKING:
     from aiogram import Bot
+
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ class DeadlineNotificationService:
                         logger.error(f"Ошибка обработки задачи {task.task_id} для уведомления: {e}")
 
                 if tasks_to_update:
+                    # Обновляем задачи в базе данных
                     for task in tasks_to_update:
                         session.add(task)
                     await session.commit()
@@ -54,6 +55,11 @@ class DeadlineNotificationService:
             logger.debug(f"Пропущена задача {task.task_id} со статусом {task.status} для уведомления о дедлайне.")
             return False
 
+        if task.deadline is None:
+            logger.debug(f"Пропущена задача {task.task_id} без дедлайна.")
+            return False
+
+        # Приводим дедлайн к осведомленному времени
         if task.deadline.tzinfo is None:
             deadline_aware = task.deadline.replace(tzinfo=self.kemerovo_tz)
         else:
@@ -62,31 +68,35 @@ class DeadlineNotificationService:
         time_left = deadline_aware - current_time
         hours_left = time_left.total_seconds() / 3600
 
+        logger.debug(f"Задача {task.task_id}: hours_left = {hours_left:.2f}, "
+                    f"24h notified: {task.notified_24_hours}, "
+                    f"10h notified: {task.notified_10_hours}, "
+                    f"2h notified: {task.notified_2_hours}")
+
         notification_sent = False
 
-        if 23.5 <= hours_left <= 48.5 and not getattr(task, 'notified_one_day', False) and task.status == TaskStatus.ACTIVE:
-            await self._send_notification(task, "завтра")
-            if hasattr(task, 'notified_one_day'):
-                task.notified_one_day = True
+        # Уведомление за 24 часа (когда осталось от 23 до 25 часов)
+        if 23.0 <= hours_left <= 25.0 and not task.notified_24_hours:
+            await self._send_notification(task, "за 24 часа")
+            task.notified_24_hours = True
             notification_sent = True
-            logger.info(f"Отправлено уведомление 'за 1 день' по задаче {task.task_id}")
+            logger.info(f"Отправлено уведомление 'за 24 часа' по задаче {task.task_id}")
 
-        elif 2.0 < hours_left <= 24.0 and not getattr(task, 'notified_today', False) and task.status == TaskStatus.ACTIVE:
-            await self._send_notification(task, "сегодня")
-            if hasattr(task, 'notified_today'):
-                task.notified_today = True
+        # Уведомление за 10 часов (когда осталось от 9 до 11 часов)
+        elif 9.0 <= hours_left <= 11.0 and not task.notified_10_hours:
+            await self._send_notification(task, "за 10 часов")
+            task.notified_10_hours = True
             notification_sent = True
-            logger.info(f"Отправлено уведомление 'сегодня' по задаче {task.task_id}")
+            logger.info(f"Отправлено уведомление 'за 10 часов' по задаче {task.task_id}")
 
-        elif 0 <= hours_left <= 2.0 and not getattr(task, 'notified_two_hours', False) and task.status == TaskStatus.ACTIVE:
-            await self._send_notification(task, "через 2 часа")
-            if hasattr(task, 'notified_two_hours'):
-                task.notified_two_hours = True
+        # Уведомление за 2 часа (когда осталось от 1 до 3 часов)
+        elif 1.0 <= hours_left <= 3.0 and not task.notified_2_hours:
+            await self._send_notification(task, "за 2 часа")
+            task.notified_2_hours = True
             notification_sent = True
             logger.info(f"Отправлено уведомление 'за 2 часа' по задаче {task.task_id}")
 
         return notification_sent
-
 
     async def _send_notification(self, task: Task, timeframe: str):
         if task.deadline.tzinfo is None:
