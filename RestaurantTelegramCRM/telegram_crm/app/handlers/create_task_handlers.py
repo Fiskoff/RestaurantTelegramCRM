@@ -12,7 +12,6 @@ from app.keyboards.create_task_keyboards import create_employee_selection_keyboa
 from core.models.base_model import SectorStatus
 from app.keyboards.deadline_keyboars import create_deadline_keyboard, calculate_deadline_from_callback
 
-
 create_task_router = Router()
 
 
@@ -30,35 +29,53 @@ async def start_create_task(message: Message, state: FSMContext):
     manager_id = message.from_user.id
     await state.update_data(manager_id=manager_id)
 
-    await message.answer(
-        "Как вы хотите назначить задачу?\n"
-        "1 - Конкретному сотруднику\n"
-        "2 - Всему сектору\n"
-        "3 - Отменить создание задачи"
-    )
+    # Создаем инлайн клавиатуру для выбора типа назначения
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Конкретному сотруднику", callback_data="assignment:employee")],
+        [InlineKeyboardButton(text="Всему сектору", callback_data="assignment:sector")],
+        [InlineKeyboardButton(text="Отменить создание задачи", callback_data="assignment:cancel")]
+    ])
+
+    await message.answer("Как вы хотите назначить задачу?", reply_markup=keyboard)
     await state.set_state(CreateTask.waiting_for_assignment_type)
 
 
-@create_task_router.message(CreateTask.waiting_for_assignment_type)
-async def process_assignment_type(message: Message, state: FSMContext):
-    if message.text == "1":
+@create_task_router.callback_query(lambda c: c.data and c.data.startswith('assignment:'))
+async def process_assignment_type(callback_query: CallbackQuery, state: FSMContext):
+    assignment_type = callback_query.data.split(':')[1]
+
+    if assignment_type == "employee":
         keyboard = await create_employee_selection_keyboard()
-        await message.answer("Выберите сотрудника, которому хотите назначить задачу:", reply_markup=keyboard)
+        await callback_query.message.edit_text("Выберите сотрудника, которому хотите назначить задачу:",
+                                               reply_markup=keyboard)
         await state.set_state(CreateTask.waiting_for_executor_id)
-    elif message.text == "2":
-        keyboard = create_sector_selection_keyboard()
-        await message.answer("Выберите сектор, которому хотите назначить задачу:", reply_markup=keyboard)
+    elif assignment_type == "sector":
+        # Создаем инлайн клавиатуру для выбора сектора
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Бар", callback_data="select_sector:bar")],
+            [InlineKeyboardButton(text="Зал", callback_data="select_sector:hall")],
+            [InlineKeyboardButton(text="Кухня", callback_data="select_sector:kitchen")],
+            [InlineKeyboardButton(text="Отмена", callback_data="select_sector:cancel")]
+        ])
+
+        await callback_query.message.edit_text("Выберите сектор, которому хотите назначить задачу:",
+                                               reply_markup=keyboard)
         await state.set_state(CreateTask.waiting_for_sector)
-    elif message.text == "3":
-        await message.answer("Создание задачи, отменено!")
+    elif assignment_type == "cancel":
+        await callback_query.message.edit_text("Создание задачи отменено!")
         await state.clear()
-    else:
-        await message.answer(
-            "Пожалуйста, выберите тип назначения:\n"
-            "1 - Конкретному сотруднику\n"
-            "2 - Всему сектору\n"
-            "3 - Отменить создание задачи"
-        )
+
+    await callback_query.answer()
+
+
+# Удаляем этот хендлер, так как теперь используем callback
+# @create_task_router.message(CreateTask.waiting_for_assignment_type)
+# async def process_assignment_type(message: Message, state: FSMContext):
+#     # ... старый код ...
 
 
 @create_task_router.callback_query(lambda c: c.data and c.data.startswith('select_employee:'))
@@ -73,7 +90,7 @@ async def process_employee_selection(callback_query: CallbackQuery, state: FSMCo
     await state.update_data(executor_id=executor_id)
     await state.update_data(sector_task=None)
     await callback_query.answer()
-    await callback_query.message.answer("Напишите название задачи")
+    await callback_query.message.edit_text("Напишите название задачи")
     await state.set_state(CreateTask.waiting_for_title)
 
 
@@ -81,6 +98,14 @@ async def process_employee_selection(callback_query: CallbackQuery, state: FSMCo
 async def process_sector_selection(callback_query: CallbackQuery, state: FSMContext):
     try:
         sector_str = callback_query.data.split(':')[1]
+
+        # Проверяем, если пользователь выбрал отмену
+        if sector_str == "cancel":
+            await callback_query.message.edit_text("Создание задачи отменено!")
+            await state.clear()
+            await callback_query.answer()
+            return
+
         sector_map = {
             "bar": SectorStatus.BAR,
             "hall": SectorStatus.HALL,
@@ -95,20 +120,17 @@ async def process_sector_selection(callback_query: CallbackQuery, state: FSMCont
         await state.update_data(sector_task=sector)
         await state.update_data(executor_id=None)
         await callback_query.answer()
-        await callback_query.message.answer("Напишите название задачи")
+        await callback_query.message.edit_text("Напишите название задачи")
         await state.set_state(CreateTask.waiting_for_title)
     except (IndexError, ValueError):
         await callback_query.answer("Ошибка при обработке выбора сектора.", show_alert=True)
         return
 
 
-@create_task_router.message(CreateTask.waiting_for_executor_id)
-async def process_executor(message: Message, state: FSMContext):
-    executor_id = message.text.strip()
-    await state.update_data(executor_id=executor_id)
-    await state.update_data(sector_task=None)
-    await message.answer("Напишите название задачи")
-    await state.set_state(CreateTask.waiting_for_title)
+# Удаляем этот хендлер, так как теперь используем callback
+# @create_task_router.message(CreateTask.waiting_for_executor_id)
+# async def process_executor(message: Message, state: FSMContext):
+#     # ... старый код ...
 
 
 @create_task_router.message(CreateTask.waiting_for_title)
@@ -150,7 +172,7 @@ async def process_deadline_callback(callback_query: CallbackQuery, state: FSMCon
     elif deadline_dt:
         await state.update_data(deadline=deadline_dt)
         await callback_query.message.edit_text(
-            f"Выбран срок: {callback_query.message.text}")
+            f"Выбран срок: {deadline_dt.strftime('%d.%m.%Y - %H:%M')}")
     else:
         await callback_query.message.edit_text("Ошибка при выборе срока. Попробуйте снова.")
         return
