@@ -9,17 +9,17 @@
 /.idea_modules/
 
 # Виртуальные окружения
-#venv/
-#env/
-#__pycache__/
-#*.pyc
-#*.pyo
-#*.pyd
-#.Python
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
 
 # Логи и базы данных
-#*.log
-#sqlite3
+*.log
+sqlite3
 
-#env
-#alembic.ini
+env
+alembic.ini
